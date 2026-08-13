@@ -6,8 +6,7 @@ android {
 
     namespace = "com.example.cepapplication"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
+        version = release(37) {
         }
     }
 
@@ -15,8 +14,7 @@ android {
         applicationId = "com.example.cepapplication"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

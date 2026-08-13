@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Cep Application</string>
+    <string name="toolbar_title">Busca CEP</string>
+    <string name="text_main">CEP</string>
+    <string name="hint_text">Digite o CEP</string>
+    <string name="btn_text">Salvar</string>
+    <string name="cep_salvo_text">CEP Salvo: %1$s</string>
+    <string name="error_invalid_zip_code">Digite um CEP válido</string>
+    <string name="toast_zip_code_saved">CEP salvo com sucesso!</string>
+
+
 </resources>

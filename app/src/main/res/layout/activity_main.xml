@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Layout principal da MainActivity.
-    Este arquivo define a interface do usuário para a funcionalidade de consulta e salvamento de CEP.
-    Contém um formulário simples com entrada de texto e um botão de ação.
+    Main layout for MainActivity.
+    This file defines the UI for the Zip Code search and save functionality.
+    Contains a simple form with text entry and an action button.
 -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -12,60 +12,76 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <!-- Botão para disparar a ação de salvar os dados do CEP -->
+    <!-- Button to trigger the zip code saving action -->
     <Button
-        android:id="@+id/btnSalvar"
+        android:id="@+id/btnSave"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="@dimen/margin_medium"
         android:drawableTint="#FFFFFF"
-        android:text="Salvar"
+        android:text="@string/btn_text"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/etCep" />
+        app:layout_constraintTop_toBottomOf="@+id/edtZipCode" />
 
-    <!-- Rótulo indicativo para o campo de entrada do CEP -->
     <TextView
-        android:id="@+id/cepText"
+        android:id="@+id/txtSavedZipCode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="60dp"
-        android:fontFamily="sans-serif-black"
-        android:text="CEP :"
-        android:textSize="20sp"
+        android:layout_marginTop="@dimen/margin_large"
+        android:text="@string/cep_salvo_text"
+        android:textColor="@color/primary_color"
+        android:textSize="@dimen/text_medium"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tbPrincipal" />
+        app:layout_constraintTop_toBottomOf="@+id/btnSave" />
 
-    <!-- Campo de entrada de texto para o usuário digitar o CEP -->
+    <!-- Label for the Zip Code input field -->
+    <TextView
+        android:id="@+id/zipCodeLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/margin_standard"
+        android:layout_marginTop="@dimen/margin_huge"
+        android:fontFamily="sans-serif-black"
+        android:text="@string/text_main"
+        android:textColor="@color/primary_color"
+        android:textSize="@dimen/text_large"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/toolbarMain"/>
+
+    <!-- Text input field for the user to enter the Zip Code -->
     <EditText
-        android:id="@+id/etCep"
+        android:id="@+id/edtZipCode"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="24dp"
-        android:ems="10"
-        android:hint="Digite o CEP"
-        android:inputType="textPostalAddress"
-        android:textSize="20sp"
+        android:layout_marginStart="@dimen/margin_standard"
+        android:layout_marginTop="@dimen/margin_medium"
+        android:layout_marginEnd="@dimen/margin_standard"
+        android:hint="@string/hint_text"
+        android:inputType="number"
+        android:maxLength="9"
+        android:textSize="@dimen/text_large"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/cepText" />
+        app:layout_constraintTop_toBottomOf="@+id/zipCodeLabel" />
 
-    <!-- Barra de ferramentas superior da aplicação -->
+    <!-- Application top toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/tbPrincipal"
+        android:id="@+id/toolbarMain"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="?attr/colorPrimary"
         android:minHeight="?attr/actionBarSize"
+        android:paddingTop="@dimen/padding_toolbar"
         android:theme="?attr/actionBarTheme"
+        android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:title="@string/toolbar_title"
+        app:titleTextColor="@color/primary_text_color" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

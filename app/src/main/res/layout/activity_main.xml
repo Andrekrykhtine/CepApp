@@ -33,6 +33,7 @@
         android:text="@string/cep_salvo_text"
         android:textColor="@color/primary_color"
         android:textSize="@dimen/text_medium"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/btnSave" />

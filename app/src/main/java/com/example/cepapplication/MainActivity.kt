@@ -1,11 +1,11 @@
 package com.example.cepapplication
 
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
+import androidx.core.widget.doAfterTextChanged
 import com.example.cepapplication.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -20,17 +20,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val sharedPrefs by lazy {
-        getSharedPreferences(
-            PREFS_NAME,
-            MODE_PRIVATE
-        )
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContentView(binding.root)
-
         setSupportActionBar(binding.toolbarMain)
         setupZipCodeMask()
         loadZipCode()
@@ -43,63 +38,38 @@ class MainActivity : AppCompatActivity() {
     private fun setupZipCodeMask() {
         var isUpdating = false
 
-        binding.edtZipCode.addTextChangedListener(object : TextWatcher {
+        binding.edtZipCode.doAfterTextChanged { editable ->
+            if (isUpdating) return@doAfterTextChanged
 
-            override fun beforeTextChanged(
-                s: CharSequence?,
-                start: Int,
-                count: Int,
-                after: Int
-            ) {
+            val currentText = editable?.toString().orEmpty()
+            val formattedText = formatZipCode(currentText)
+
+            if (currentText != formattedText) {
+                isUpdating = true
+                binding.edtZipCode.setText(formattedText)
+                binding.edtZipCode.setSelection(formattedText.length)
+                isUpdating = false
             }
-
-            override fun onTextChanged(
-                s: CharSequence?,
-                start: Int,
-                before: Int,
-                count: Int
-            ) {
-            }
-
-            override fun afterTextChanged(editable: Editable?) {
-                if (isUpdating) return
-
-                val currentText = editable
-                    ?.toString()
-                    .orEmpty()
-
-                val formattedText = formatZipCode(currentText)
-
-                if (currentText != formattedText) {
-                    isUpdating = true
-
-                    binding.edtZipCode.setText(formattedText)
-                    binding.edtZipCode.setSelection(formattedText.length)
-
-                    isUpdating = false
-                }
-            }
-        })
+        }
     }
 
     private fun loadZipCode() {
-        val savedZipCode = sharedPrefs
-            .getString(ZIP_CODE_KEY, "")
-            .orEmpty()
-
+        val savedZipCode = sharedPrefs.getString(ZIP_CODE_KEY, "").orEmpty()
         val formattedZipCode = formatZipCode(savedZipCode)
         displaySavedZipCode(formattedZipCode)
     }
 
     private fun displaySavedZipCode(zipCode: String) {
-        binding.txtSavedZipCode.text =
-            getString(R.string.cep_salvo_text, zipCode)
+        binding.txtSavedZipCode.visibility = if (shouldDisplaySavedZipCode(zipCode)) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        binding.txtSavedZipCode.text = getString(R.string.cep_salvo_text, zipCode)
     }
 
     private fun saveZipCode() {
-        val zipCode = binding.edtZipCode.text
-            .toString()
-            .filter { it.isDigit() }
+        val zipCode = binding.edtZipCode.text.toString().filter { it.isDigit() }
 
         if (zipCode.length != 8) {
             binding.edtZipCode.error = getString(R.string.error_invalid_zip_code)
@@ -111,21 +81,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         displaySavedZipCode(formatZipCode(zipCode))
-
         binding.edtZipCode.text.clear()
 
-        Toast.makeText(
-            this,
-            getString(R.string.toast_zip_code_saved),
-            Toast.LENGTH_SHORT
-        ).show()
+        Toast.makeText(this, getString(R.string.toast_zip_code_saved), Toast.LENGTH_SHORT).show()
     }
 
     private fun formatZipCode(value: String): String {
-        val numbers = value
-            .filter { it.isDigit() }
-            .take(8)
-
+        val numbers = value.filter { it.isDigit() }.take(8)
         return if (numbers.length > 5) {
             "${numbers.substring(0, 5)}-${numbers.substring(5)}"
         } else {
@@ -133,3 +95,5 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
+
+internal fun shouldDisplaySavedZipCode(zipCode: String): Boolean = zipCode.isNotBlank()

@@ -3,24 +3,34 @@ package com.example.cepapplication
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.edit
 import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.cepapplication.databinding.ActivityMainBinding
+import com.example.cepapplication.data.CepDatabase
+import com.example.cepapplication.data.RoomCepRepository
+import com.example.cepapplication.ui.CepUiEvent
+import com.example.cepapplication.ui.CepUiState
+import com.example.cepapplication.ui.CepViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
-    private companion object {
-        const val PREFS_NAME = "app_data"
-        const val ZIP_CODE_KEY = "saved_zip_code"
-    }
+    private var isUpdatingZipCode = false
 
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
 
-    private val sharedPrefs by lazy {
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+    private val viewModel: CepViewModel by viewModels {
+        CepViewModel.Factory(
+            RoomCepRepository(
+                cepDao = CepDatabase.getInstance(applicationContext).cepDao()
+            )
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,70 +38,64 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbarMain)
         setupZipCodeMask()
-        loadZipCode()
+        observeUiState()
 
         binding.btnSave.setOnClickListener {
-            saveZipCode()
+            viewModel.saveZipCode()
         }
     }
 
     private fun setupZipCodeMask() {
-        var isUpdating = false
-
         binding.edtZipCode.doAfterTextChanged { editable ->
-            if (isUpdating) return@doAfterTextChanged
+            if (isUpdatingZipCode) return@doAfterTextChanged
 
-            val currentText = editable?.toString().orEmpty()
-            val formattedText = formatZipCode(currentText)
+            viewModel.onZipCodeChanged(editable?.toString().orEmpty())
+        }
+    }
 
-            if (currentText != formattedText) {
-                isUpdating = true
-                binding.edtZipCode.setText(formattedText)
-                binding.edtZipCode.setSelection(formattedText.length)
-                isUpdating = false
+    private fun observeUiState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.uiState.collect(::render)
+                }
+                launch {
+                    viewModel.events.collect(::handleEvent)
+                }
             }
         }
     }
 
-    private fun loadZipCode() {
-        val savedZipCode = sharedPrefs.getString(ZIP_CODE_KEY, "").orEmpty()
-        val formattedZipCode = formatZipCode(savedZipCode)
-        displaySavedZipCode(formattedZipCode)
+    private fun handleEvent(event: CepUiEvent) {
+        when (event) {
+            CepUiEvent.ZipCodeSaved -> Toast.makeText(
+                this,
+                getString(R.string.toast_zip_code_saved),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
-    private fun displaySavedZipCode(zipCode: String) {
-        binding.txtSavedZipCode.visibility = if (shouldDisplaySavedZipCode(zipCode)) {
+    private fun render(state: CepUiState) {
+        val currentInput = binding.edtZipCode.text.toString()
+        if (currentInput != state.inputZipCode) {
+            isUpdatingZipCode = true
+            binding.edtZipCode.setText(state.inputZipCode)
+            binding.edtZipCode.setSelection(state.inputZipCode.length)
+            isUpdatingZipCode = false
+        }
+
+        val savedZipCode = state.savedZipCode
+        binding.txtSavedZipCode.visibility = if (shouldDisplaySavedZipCode(savedZipCode.orEmpty())) {
             View.VISIBLE
         } else {
             View.GONE
         }
-        binding.txtSavedZipCode.text = getString(R.string.cep_salvo_text, zipCode)
-    }
-
-    private fun saveZipCode() {
-        val zipCode = binding.edtZipCode.text.toString().filter { it.isDigit() }
-
-        if (zipCode.length != 8) {
-            binding.edtZipCode.error = getString(R.string.error_invalid_zip_code)
-            return
-        }
-
-        sharedPrefs.edit {
-            putString(ZIP_CODE_KEY, zipCode)
-        }
-
-        displaySavedZipCode(formatZipCode(zipCode))
-        binding.edtZipCode.text.clear()
-
-        Toast.makeText(this, getString(R.string.toast_zip_code_saved), Toast.LENGTH_SHORT).show()
-    }
-
-    private fun formatZipCode(value: String): String {
-        val numbers = value.filter { it.isDigit() }.take(8)
-        return if (numbers.length > 5) {
-            "${numbers.substring(0, 5)}-${numbers.substring(5)}"
+        binding.txtSavedZipCode.text = getString(R.string.cep_salvo_text, savedZipCode.orEmpty())
+        binding.edtZipCode.error = if (state.isZipCodeInvalid) {
+            getString(R.string.error_invalid_zip_code)
         } else {
-            numbers
+            null
         }
     }
 }

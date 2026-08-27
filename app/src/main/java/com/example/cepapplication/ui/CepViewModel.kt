@@ -11,15 +11,13 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 class CepViewModel(
     private val repository: CepRepository
 ) : ViewModel() {
 
-    private val repositoryMutex = Mutex()
     private val _uiState = MutableStateFlow(CepUiState())
     val uiState: StateFlow<CepUiState> = _uiState.asStateFlow()
     private val _events = MutableSharedFlow<CepUiEvent>()
@@ -27,8 +25,8 @@ class CepViewModel(
 
     init {
         viewModelScope.launch {
-            repositoryMutex.withLock {
-                _uiState.value = _uiState.value.copy(
+            _uiState.update { currentState ->
+                currentState.copy(
                     savedZipCode = repository.getSavedZipCode()?.let(CepFormatter::format)
                 )
             }
@@ -36,26 +34,31 @@ class CepViewModel(
     }
 
     fun onZipCodeChanged(value: String) {
-        _uiState.value = _uiState.value.copy(
-            inputZipCode = CepFormatter.format(value),
-            isZipCodeInvalid = false
-        )
+        _uiState.update { currentState ->
+            currentState.copy(
+                inputZipCode = CepFormatter.format(value),
+                isZipCodeInvalid = false
+            )
+        }
     }
 
     fun saveZipCode() {
         val currentInput = _uiState.value.inputZipCode
         if (!CepFormatter.isValid(currentInput)) {
-            _uiState.value = _uiState.value.copy(isZipCodeInvalid = true)
+            _uiState.update { currentState ->
+                currentState.copy(isZipCodeInvalid = true)
+            }
             return
         }
 
         val normalizedZipCode = CepFormatter.normalize(currentInput)
         viewModelScope.launch {
-            repositoryMutex.withLock {
-                repository.saveZipCode(normalizedZipCode)
-                _uiState.value = CepUiState(
+            repository.saveZipCode(normalizedZipCode)
+            _uiState.update { currentState ->
+                currentState.copy(
                     inputZipCode = "",
-                    savedZipCode = CepFormatter.format(normalizedZipCode)
+                    savedZipCode = CepFormatter.format(normalizedZipCode),
+                    isZipCodeInvalid = false
                 )
             }
             _events.emit(CepUiEvent.ZipCodeSaved)

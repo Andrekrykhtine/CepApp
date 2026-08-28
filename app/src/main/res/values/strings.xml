@@ -5,6 +5,10 @@
     <string name="hint_text">Digite o CEP</string>
     <string name="btn_text">Consultar e salvar</string>
     <string name="saved_address_title">CEPs consultados</string>
+    <string name="last_address_title">Último CEP consultado</string>
+    <string name="stored_zip_codes_button">CEPs armazenados</string>
+    <string name="stored_zip_codes_title">CEPs armazenados</string>
+    <string name="no_stored_zip_codes">Nenhum CEP armazenado.</string>
     <string name="cep_salvo_text">CEP: %1$s</string>
     <string name="street_text">Logradouro: %1$s</string>
     <string name="complement_text">Complemento: %1$s</string>

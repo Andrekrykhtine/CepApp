@@ -36,7 +36,11 @@ class AddressStore(context: Context) {
         check(rowId != -1L) { "Não foi possível salvar o CEP" }
     }
 
-    fun loadAll(): List<Address> = buildList {
+    fun loadAll(): List<Address> = queryAddresses()
+
+    fun loadLatest(): Address? = queryAddresses(limit = "1").firstOrNull()
+
+    private fun queryAddresses(limit: String? = null): List<Address> = buildList {
         databaseHelper.readableDatabase.query(
             TABLE_ADDRESSES,
             COLUMNS,
@@ -45,6 +49,7 @@ class AddressStore(context: Context) {
             null,
             null,
             "$COLUMN_ID DESC",
+            limit,
         ).use { cursor ->
             val zipCodeIndex = cursor.getColumnIndexOrThrow(COLUMN_ZIP_CODE)
             val streetIndex = cursor.getColumnIndexOrThrow(COLUMN_STREET)

@@ -4,23 +4,33 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.edit
 import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.lifecycleScope
+import com.example.cepapplication.data.Address
+import com.example.cepapplication.data.AddressRepository
+import com.example.cepapplication.data.AddressStore
+import com.example.cepapplication.data.ViaCepService
 import com.example.cepapplication.databinding.ActivityMainBinding
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val PREFS_NAME = "app_data"
-        const val ZIP_CODE_KEY = "saved_zip_code"
     }
 
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
 
-    private val sharedPrefs by lazy {
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+    private val addressStore by lazy {
+        AddressStore(getSharedPreferences(PREFS_NAME, MODE_PRIVATE))
+    }
+
+    private val addressRepository by lazy {
+        AddressRepository(ViaCepService.api)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,10 +38,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbarMain)
         setupZipCodeMask()
-        loadZipCode()
+        displaySavedAddress(addressStore.load())
 
         binding.btnSave.setOnClickListener {
-            saveZipCode()
+            lookupAndSaveZipCode()
         }
     }
 
@@ -53,47 +63,77 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadZipCode() {
-        val savedZipCode = sharedPrefs.getString(ZIP_CODE_KEY, "").orEmpty()
-        val formattedZipCode = formatZipCode(savedZipCode)
-        displaySavedZipCode(formattedZipCode)
-    }
-
-    private fun displaySavedZipCode(zipCode: String) {
-        binding.txtSavedZipCode.visibility = if (shouldDisplaySavedZipCode(zipCode)) {
-            View.VISIBLE
-        } else {
-            View.GONE
-        }
-        binding.txtSavedZipCode.text = getString(R.string.cep_salvo_text, zipCode)
-    }
-
-    private fun saveZipCode() {
-        val zipCode = binding.edtZipCode.text.toString().filter { it.isDigit() }
+    private fun lookupAndSaveZipCode() {
+        val zipCode = binding.edtZipCode.text.toString().filter(Char::isDigit)
 
         if (zipCode.length != 8) {
             binding.edtZipCode.error = getString(R.string.error_invalid_zip_code)
             return
         }
 
-        sharedPrefs.edit {
-            putString(ZIP_CODE_KEY, zipCode)
+        lifecycleScope.launch {
+            setLoading(true)
+            try {
+                val address = addressRepository.findAddress(zipCode)
+                if (address == null) {
+                    binding.edtZipCode.error = getString(R.string.error_zip_code_not_found)
+                    return@launch
+                }
+
+                addressStore.save(address)
+                displaySavedAddress(address)
+                binding.edtZipCode.text.clear()
+                Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.toast_zip_code_saved),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: IOException) {
+                showLookupError()
+            } catch (error: Exception) {
+                showLookupError()
+            } finally {
+                setLoading(false)
+            }
         }
-
-        displaySavedZipCode(formatZipCode(zipCode))
-        binding.edtZipCode.text.clear()
-
-        Toast.makeText(this, getString(R.string.toast_zip_code_saved), Toast.LENGTH_SHORT).show()
     }
 
-    private fun formatZipCode(value: String): String {
-        val numbers = value.filter { it.isDigit() }.take(8)
-        return if (numbers.length > 5) {
-            "${numbers.substring(0, 5)}-${numbers.substring(5)}"
-        } else {
-            numbers
-        }
+    private fun setLoading(isLoading: Boolean) {
+        binding.btnSave.isEnabled = !isLoading
+        binding.edtZipCode.isEnabled = !isLoading
+        binding.progressLookup.visibility = if (isLoading) View.VISIBLE else View.GONE
     }
+
+    private fun showLookupError() {
+        Toast.makeText(this, getString(R.string.error_network), Toast.LENGTH_LONG).show()
+    }
+
+    private fun displaySavedAddress(address: Address?) {
+        binding.cardSavedAddress.visibility = if (address == null) View.GONE else View.VISIBLE
+        if (address == null) return
+
+        binding.txtSavedAddress.text = listOf(
+            getString(R.string.cep_salvo_text, formatZipCode(address.zipCode)),
+            getString(R.string.street_text, displayValue(address.street)),
+            getString(R.string.complement_text, displayValue(address.complement)),
+            getString(R.string.neighborhood_text, displayValue(address.neighborhood)),
+            getString(R.string.city_text, displayValue(address.city)),
+            getString(R.string.state_abbreviation_text, displayValue(address.stateAbbreviation)),
+            getString(R.string.state_text, displayValue(address.state)),
+        ).joinToString(separator = "\n")
+    }
+
+    private fun displayValue(value: String): String =
+        value.ifBlank { getString(R.string.not_informed) }
 }
 
-internal fun shouldDisplaySavedZipCode(zipCode: String): Boolean = zipCode.isNotBlank()
+internal fun formatZipCode(value: String): String {
+    val numbers = value.filter(Char::isDigit).take(8)
+    return if (numbers.length > 5) {
+        "${numbers.substring(0, 5)}-${numbers.substring(5)}"
+    } else {
+        numbers
+    }
+}

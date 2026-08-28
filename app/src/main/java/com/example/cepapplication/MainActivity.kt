@@ -12,21 +12,19 @@ import com.example.cepapplication.data.AddressStore
 import com.example.cepapplication.data.ViaCepService
 import com.example.cepapplication.databinding.ActivityMainBinding
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
-
-    private companion object {
-        const val PREFS_NAME = "app_data"
-    }
 
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
 
     private val addressStore by lazy {
-        AddressStore(getSharedPreferences(PREFS_NAME, MODE_PRIVATE))
+        AddressStore(applicationContext)
     }
 
     private val addressRepository by lazy {
@@ -38,7 +36,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbarMain)
         setupZipCodeMask()
-        displaySavedAddress(addressStore.load())
+        loadSavedAddresses()
 
         binding.btnSave.setOnClickListener {
             lookupAndSaveZipCode()
@@ -80,8 +78,11 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                addressStore.save(address)
-                displaySavedAddress(address)
+                val savedAddresses = withContext(Dispatchers.IO) {
+                    addressStore.save(address)
+                    addressStore.loadAll()
+                }
+                displaySavedAddresses(savedAddresses)
                 binding.edtZipCode.text.clear()
                 Toast.makeText(
                     this@MainActivity,
@@ -110,20 +111,31 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, getString(R.string.error_network), Toast.LENGTH_LONG).show()
     }
 
-    private fun displaySavedAddress(address: Address?) {
-        binding.cardSavedAddress.visibility = if (address == null) View.GONE else View.VISIBLE
-        if (address == null) return
-
-        binding.txtSavedAddress.text = listOf(
-            getString(R.string.cep_salvo_text, formatZipCode(address.zipCode)),
-            getString(R.string.street_text, displayValue(address.street)),
-            getString(R.string.complement_text, displayValue(address.complement)),
-            getString(R.string.neighborhood_text, displayValue(address.neighborhood)),
-            getString(R.string.city_text, displayValue(address.city)),
-            getString(R.string.state_abbreviation_text, displayValue(address.stateAbbreviation)),
-            getString(R.string.state_text, displayValue(address.state)),
-        ).joinToString(separator = "\n")
+    private fun loadSavedAddresses() {
+        lifecycleScope.launch {
+            val addresses = withContext(Dispatchers.IO) { addressStore.loadAll() }
+            displaySavedAddresses(addresses)
+        }
     }
+
+    private fun displaySavedAddresses(addresses: List<Address>) {
+        binding.cardSavedAddress.visibility = if (addresses.isEmpty()) View.GONE else View.VISIBLE
+        if (addresses.isEmpty()) return
+
+        binding.txtSavedAddress.text = addresses.joinToString(separator = "\n\n") { address ->
+            formatAddress(address)
+        }
+    }
+
+    private fun formatAddress(address: Address): String = listOf(
+        getString(R.string.cep_salvo_text, formatZipCode(address.zipCode)),
+        getString(R.string.street_text, displayValue(address.street)),
+        getString(R.string.complement_text, displayValue(address.complement)),
+        getString(R.string.neighborhood_text, displayValue(address.neighborhood)),
+        getString(R.string.city_text, displayValue(address.city)),
+        getString(R.string.state_abbreviation_text, displayValue(address.stateAbbreviation)),
+        getString(R.string.state_text, displayValue(address.state)),
+    ).joinToString(separator = "\n")
 
     private fun displayValue(value: String): String =
         value.ifBlank { getString(R.string.not_informed) }

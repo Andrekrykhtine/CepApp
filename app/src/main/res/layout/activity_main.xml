@@ -39,40 +39,47 @@
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardSavedAddress"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginStart="@dimen/margin_standard"
         android:layout_marginTop="@dimen/margin_large"
         android:layout_marginEnd="@dimen/margin_standard"
+        android:layout_marginBottom="@dimen/margin_standard"
         android:visibility="gone"
         app:cardElevation="2dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btnSave">
 
-        <LinearLayout
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="@dimen/margin_medium">
+            android:layout_height="match_parent">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/saved_address_title"
-                android:textColor="@color/primary_color"
-                android:textSize="@dimen/text_medium"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/txtSavedAddress"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/margin_small"
-                android:lineSpacingExtra="4dp"
-                android:textColor="@color/black"
-                android:textSize="@dimen/text_small"
-                tools:text="CEP: 01001-000\nLogradouro: Praça da Sé\nComplemento: lado ímpar\nBairro: Sé\nLocalidade: São Paulo\nUF: SP\nEstado: São Paulo" />
-        </LinearLayout>
+                android:orientation="vertical"
+                android:padding="@dimen/margin_medium">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/saved_address_title"
+                    android:textColor="@color/primary_color"
+                    android:textSize="@dimen/text_medium"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/txtSavedAddress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/margin_small"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="@color/black"
+                    android:textSize="@dimen/text_small"
+                    tools:text="CEP: 01001-000\nLogradouro: Praça da Sé\nComplemento: lado ímpar\nBairro: Sé\nLocalidade: São Paulo\nUF: SP\nEstado: São Paulo" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
     </com.google.android.material.card.MaterialCardView>
 
     <!-- Label for the Zip Code input field -->

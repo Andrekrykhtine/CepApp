@@ -1,4 +1,4 @@
-package com.example.cepapplication.data
+package com.example.cepapplication.domain.model
 
 data class Address(
     val zipCode: String,

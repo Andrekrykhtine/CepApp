@@ -1,15 +1,17 @@
 package com.example.cepapplication.data
 
 import com.google.gson.annotations.SerializedName
+import com.example.cepapplication.domain.model.Address
+import com.example.cepapplication.domain.util.CepFormatter
 import retrofit2.http.GET
 import retrofit2.http.Path
 
 interface ViaCepApi {
     @GET("ws/{cep}/json/")
-    suspend fun findAddress(@Path("cep") zipCode: String): ViaCepResponse
+    suspend fun findAddress(@Path("cep") zipCode: String): AddressDto
 }
 
-data class ViaCepResponse(
+data class AddressDto(
     val cep: String? = null,
     val logradouro: String? = null,
     val complemento: String? = null,
@@ -19,11 +21,11 @@ data class ViaCepResponse(
     val estado: String? = null,
     @SerializedName("erro") val hasError: Boolean? = null,
 ) {
-    fun toAddress(): Address? {
+    fun toDomain(): Address? {
         if (hasError == true || cep.isNullOrBlank()) return null
 
         return Address(
-            zipCode = cep,
+            zipCode = CepFormatter.normalize(cep),
             street = logradouro.orEmpty(),
             complement = complemento.orEmpty(),
             neighborhood = bairro.orEmpty(),

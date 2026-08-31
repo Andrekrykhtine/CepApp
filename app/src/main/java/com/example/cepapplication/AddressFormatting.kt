@@ -1,7 +1,8 @@
 package com.example.cepapplication
 
 import android.content.Context
-import com.example.cepapplication.data.Address
+import com.example.cepapplication.domain.model.Address
+import com.example.cepapplication.domain.util.CepFormatter
 
 internal fun Context.formatAddress(address: Address): String = listOf(
     getString(R.string.cep_salvo_text, formatZipCode(address.zipCode)),
@@ -17,10 +18,5 @@ private fun Context.displayValue(value: String): String =
     value.ifBlank { getString(R.string.not_informed) }
 
 internal fun formatZipCode(value: String): String {
-    val numbers = value.filter(Char::isDigit).take(8)
-    return if (numbers.length > 5) {
-        "${numbers.substring(0, 5)}-${numbers.substring(5)}"
-    } else {
-        numbers
-    }
+    return CepFormatter.format(value)
 }

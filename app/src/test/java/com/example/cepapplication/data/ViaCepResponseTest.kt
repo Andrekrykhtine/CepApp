@@ -1,13 +1,14 @@
 package com.example.cepapplication.data
 
+import com.example.cepapplication.domain.model.Address
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-class ViaCepResponseTest {
+class AddressDtoTest {
     @Test
     fun `maps a successful response to an address`() {
-        val response = ViaCepResponse(
+        val response = AddressDto(
             cep = "01001-000",
             logradouro = "Praça da Sé",
             complemento = "lado ímpar",
@@ -19,7 +20,7 @@ class ViaCepResponseTest {
 
         assertEquals(
             Address(
-                zipCode = "01001-000",
+                zipCode = "01001000",
                 street = "Praça da Sé",
                 complement = "lado ímpar",
                 neighborhood = "Sé",
@@ -27,12 +28,12 @@ class ViaCepResponseTest {
                 stateAbbreviation = "SP",
                 state = "São Paulo",
             ),
-            response.toAddress(),
+            response.toDomain(),
         )
     }
 
     @Test
     fun `does not map a response marked as not found`() {
-        assertNull(ViaCepResponse(hasError = true).toAddress())
+        assertNull(AddressDto(hasError = true).toDomain())
     }
 }

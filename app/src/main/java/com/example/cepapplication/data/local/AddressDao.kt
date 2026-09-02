@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AddressDao {
@@ -13,6 +14,6 @@ interface AddressDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(address: AddressEntity)
 
-    @Query("SELECT * FROM addresses ORDER BY id DESC")
-    suspend fun findAll(): List<AddressEntity>
+    @Query("SELECT * FROM addresses ORDER BY saved_at_epoch_millis DESC, id DESC")
+    fun observeAll(): Flow<List<AddressEntity>>
 }

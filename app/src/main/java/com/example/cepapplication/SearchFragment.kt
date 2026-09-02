@@ -130,7 +130,7 @@ class SearchFragment : Fragment() {
             ).show()
             else -> Toast.makeText(
                 requireContext(),
-                R.string.error_network,
+                R.string.error_unexpected,
                 Toast.LENGTH_LONG,
             ).show()
         }

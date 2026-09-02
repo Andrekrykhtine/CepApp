@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [AddressEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AddressDatabase : RoomDatabase() {
@@ -54,10 +54,19 @@ abstract class AddressDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE addresses " +
+                        "ADD COLUMN saved_at_epoch_millis INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
         fun create(context: Context): AddressDatabase = Room.databaseBuilder(
             context.applicationContext,
             AddressDatabase::class.java,
             DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     }
 }

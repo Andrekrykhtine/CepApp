@@ -2,6 +2,8 @@ package com.example.cepapplication.domain.usecase
 
 import com.example.cepapplication.domain.model.Address
 import com.example.cepapplication.domain.repository.CepRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,7 +46,7 @@ class GetAddressByCepUseCaseTest {
                 throw CancellationException("cancelado")
             }
 
-            override suspend fun getSavedAddresses(): List<Address> = emptyList()
+            override fun observeSavedAddresses(): Flow<List<Address>> = flowOf(emptyList())
         }
 
         GetAddressByCepUseCase(repository)("01001000")
@@ -60,7 +62,7 @@ class GetAddressByCepUseCaseTest {
             return result
         }
 
-        override suspend fun getSavedAddresses(): List<Address> = emptyList()
+        override fun observeSavedAddresses(): Flow<List<Address>> = flowOf(emptyList())
     }
 
     private fun address() = Address(

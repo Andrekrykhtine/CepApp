@@ -7,8 +7,11 @@ import com.example.cepapplication.domain.model.Address
 import com.example.cepapplication.domain.usecase.GetAddressByCepUseCase
 import com.example.cepapplication.domain.usecase.GetSavedAddressesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class CepViewModel(
@@ -18,8 +21,12 @@ class CepViewModel(
     private val _uiState = MutableStateFlow<CepUiState>(CepUiState.Idle)
     val uiState: StateFlow<CepUiState> = _uiState.asStateFlow()
 
-    private val _savedAddresses = MutableStateFlow<List<Address>>(emptyList())
-    val savedAddresses: StateFlow<List<Address>> = _savedAddresses.asStateFlow()
+    val savedAddresses: StateFlow<List<Address>> = getSavedAddresses()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+            initialValue = emptyList(),
+        )
 
     fun search(rawZipCode: String) {
         viewModelScope.launch {
@@ -31,17 +38,11 @@ class CepViewModel(
         }
     }
 
-    fun loadSavedAddresses() {
-        viewModelScope.launch {
-            _savedAddresses.value = getSavedAddresses()
-        }
-    }
-
     fun loadLatestAddress() {
         if (_uiState.value != CepUiState.Idle) return
 
         viewModelScope.launch {
-            getSavedAddresses().firstOrNull()?.let { address ->
+            getSavedAddresses().first().firstOrNull()?.let { address ->
                 _uiState.value = CepUiState.Success(address)
             }
         }

@@ -7,6 +7,9 @@ import com.example.cepapplication.domain.usecase.GetSavedAddressesUseCase
 import com.example.cepapplication.domain.usecase.InvalidCepException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -55,10 +58,11 @@ class CepViewModelTest {
 
     private class FakeCepRepository(
         private val lookup: suspend (String) -> Address?,
+        private val storedAddresses: MutableStateFlow<List<Address>> = MutableStateFlow(emptyList()),
     ) : CepRepository {
         override suspend fun getAddress(zipCode: String): Address? = lookup(zipCode)
 
-        override suspend fun getSavedAddresses(): List<Address> = emptyList()
+        override fun observeSavedAddresses(): Flow<List<Address>> = storedAddresses.asStateFlow()
     }
 
     private fun address() = Address(

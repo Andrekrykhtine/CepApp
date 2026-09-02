@@ -22,6 +22,8 @@ data class AddressEntity(
     @ColumnInfo(name = "state_abbreviation")
     val stateAbbreviation: String,
     val state: String,
+    @ColumnInfo(name = "saved_at_epoch_millis")
+    val savedAtEpochMillis: Long,
 )
 
 internal fun AddressEntity.toDomain(): Address = Address(
@@ -34,7 +36,7 @@ internal fun AddressEntity.toDomain(): Address = Address(
     state = state,
 )
 
-internal fun Address.toEntity(): AddressEntity = AddressEntity(
+internal fun Address.toEntity(savedAtEpochMillis: Long): AddressEntity = AddressEntity(
     zipCode = zipCode,
     street = street,
     complement = complement,
@@ -42,4 +44,5 @@ internal fun Address.toEntity(): AddressEntity = AddressEntity(
     city = city,
     stateAbbreviation = stateAbbreviation,
     state = state,
+    savedAtEpochMillis = savedAtEpochMillis,
 )

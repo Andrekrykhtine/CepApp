@@ -28,7 +28,7 @@ class SavedAddressesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        loadSavedAddresses()
+        observeSavedAddresses()
     }
 
     override fun onDestroyView() {
@@ -36,8 +36,7 @@ class SavedAddressesFragment : Fragment() {
         _binding = null
     }
 
-    private fun loadSavedAddresses() {
-        viewModel.loadSavedAddresses()
+    private fun observeSavedAddresses() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.savedAddresses.collect { addresses ->

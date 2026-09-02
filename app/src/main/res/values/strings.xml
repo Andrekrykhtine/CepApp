@@ -20,7 +20,8 @@
     <string name="error_invalid_zip_code">Digite um CEP válido</string>
     <string name="error_zip_code_not_found">CEP não encontrado</string>
     <string name="error_network">Não foi possível consultar o CEP. Verifique sua conexão e tente novamente.</string>
-    <string name="toast_zip_code_saved">CEP consultado e salvo com sucesso!</string>
+    <string name="error_unexpected">Não foi possível concluir a consulta. Tente novamente.</string>
+    <string name="toast_zip_code_saved">Endereço disponível.</string>
 
 
 </resources>

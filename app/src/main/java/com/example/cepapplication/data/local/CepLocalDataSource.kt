@@ -9,6 +9,10 @@ data class CachedAddress(
 )
 
 interface CepLocalDataSource {
+    suspend fun findAndRecordConsultation(zipCode: String): Address?
+
+    suspend fun saveAndRecordConsultation(address: Address, savedAtEpochMillis: Long): Address
+
     suspend fun findByZipCode(zipCode: String): CachedAddress?
 
     suspend fun save(address: Address, savedAtEpochMillis: Long)

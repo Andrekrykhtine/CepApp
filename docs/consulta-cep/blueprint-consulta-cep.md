@@ -478,9 +478,9 @@ As tarefas abaixo são planejadas, não executadas. Caminhos reais existentes e 
 - **O que:** executar comandos completos, corrigir falhas do escopo e produzir relatório com resultados reais, ambiente e limitações.
 - **Onde:** Gradle Wrapper; novo `docs/consulta-cep/validacao-consulta-cep.md`.
 - **Dependências:** T-010.
-- **Aceite:** testes unitários/build aprovados e instrumentados executados em dispositivo/emulador disponível. Se impedido, registrar erro, comando e pendências, sem alegar validação integral. Não tratar problema histórico de loopback como resultado atual.
+- **Aceite:** testes unitários e build aprovados. A validação padrão do projeto não requer aparelho, emulador, ADB ou execução de testes instrumentados; esses testes podem permanecer como cobertura complementar. Não tratar problema histórico de loopback como resultado atual.
 - **Unitários:** executar `testDebugUnitTest` pelo Wrapper, conforme os comandos PowerShell abaixo.
-- **Integração/E2E:** `connectedDebugAndroidTest`; registrar quais classes/cenários passaram e quais não executaram.
+- **Integração/E2E:** cobrir os cenários por testes automatizados que possam ser executados sem aparelho/emulador. Registrar as classes e cenários efetivamente executados.
 - **Build/documentação:** `assembleDebug` e `git diff --check`. Reexecutar após correção somente verificações pertinentes e a consolidação necessária.
 - **Complexidade:** média.
 
@@ -489,11 +489,10 @@ Comandos previstos no PowerShell:
 ```powershell
 .\gradlew.bat testDebugUnitTest
 .\gradlew.bat assembleDebug
-.\gradlew.bat connectedDebugAndroidTest
 git diff --check
 ```
 
-O relatório deverá conter data, revisão/estado testado, versões efetivas de execução, dispositivo/API, comandos, resultados, cenários cobertos e pendências. Não incluir credenciais ou conteúdo sensível do ambiente.
+O relatório deverá conter data, revisão/estado testado, versões efetivas de execução, comandos, resultados, cenários cobertos e pendências. Não incluir credenciais ou conteúdo sensível do ambiente.
 
 ### Fase 5 — Documentação e entrega
 
@@ -621,7 +620,7 @@ EC-014 corresponde ao aceite adicional do FRD revisado. EC-015 é verificação 
 | Restauração atrasada | Invalidação exclusiva dessa leitura e conferência antes de publicar |
 | Erro de observação aparecer como vazio | Preservar últimos dados e distinguir leitura vazia confirmada de erro |
 | Versões locais e runtime de build | Verificar com Wrapper na implementação; não inferir JDK de execução só de sourceCompatibility |
-| Instrumentação sem dispositivo | Registrar pendência; não declarar validação integral |
+| Testes instrumentados indisponíveis | Não bloqueiam a validação padrão; registrar a limitação somente se ela afetar algum cenário que não possua cobertura automatizada executável sem aparelho/emulador |
 | Rede controlada nos E2E | Demonstra lógica/integração interna; não certifica disponibilidade pública nem transporte real da ViaCEP |
 
 Não há decisão funcional bloqueante remanescente. Detalhes de mecânica de testes e organização de helpers podem ser ajustados sem alterar contratos, escopo ou resultados obrigatórios. Qualquer impedimento que exija mudança funcional deve ser apresentado ao usuário antes de alterar o escopo.

@@ -26,7 +26,7 @@ class CepViewModelTest {
     @Test
     fun `moves from loading to success when address is found`() = runTest {
         val deferredAddress = CompletableDeferred<Address?>()
-        val repository = FakeCepRepository { deferredAddress.await() }
+        val repository = FakeCepRepository(lookup = { _ -> deferredAddress.await() })
         val viewModel = createViewModel(repository)
 
         viewModel.search("01001-000")
@@ -41,7 +41,7 @@ class CepViewModelTest {
 
     @Test
     fun `moves to error with identifiable cause when zip code is invalid`() = runTest {
-        val viewModel = createViewModel(FakeCepRepository { address() })
+        val viewModel = createViewModel(FakeCepRepository(lookup = { _ -> address() }))
 
         viewModel.search("01001-00")
         advanceUntilIdle()

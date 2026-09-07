@@ -82,6 +82,12 @@ class CepRepositoryImplTest {
     ) : CepLocalDataSource {
         val saved = mutableListOf<SavedAddress>()
 
+        override suspend fun findAndRecordConsultation(zipCode: String): Address? =
+            error("O repositório passará a usar este contrato na T-003")
+
+        override suspend fun saveAndRecordConsultation(address: Address, savedAtEpochMillis: Long): Address =
+            error("O repositório passará a usar este contrato na T-003")
+
         override suspend fun findByZipCode(zipCode: String): CachedAddress? = cached
 
         override suspend fun save(address: Address, savedAtEpochMillis: Long) {

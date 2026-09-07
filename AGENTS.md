@@ -56,14 +56,8 @@ Use o Gradle Wrapper do repositório. No PowerShell, conforme o escopo da altera
 .\gradlew.bat assembleDebug
 ```
 
-Quando necessário para verificar banco, migração ou UI e houver dispositivo/emulador disponível:
-
-```powershell
-.\gradlew.bat connectedDebugAndroidTest
-```
-
-- Testes unitários existentes ficam em `app/src/test/`; instrumentados em `app/src/androidTest/`.
-- Para mudanças de cache e histórico, verificar retorno local sem rede independentemente da idade, cache miss com salvamento, ausência de duplicatas, recência em consultas locais e preservação de histórico após falhas.
+- A validação padrão deste projeto não exige aparelho, emulador, ADB ou `connectedDebugAndroidTest`. Testes instrumentados em `app/src/androidTest/` podem permanecer como cobertura complementar, mas não são condição de aceite nem precisam ser executados para concluir uma alteração.
+- Para mudanças de cache e histórico, verificar nos testes automatizados executáveis retorno local sem rede independentemente da idade, cache miss com salvamento, ausência de duplicatas, recência em consultas locais e preservação de histórico após falhas.
 - Atualizar testes que imponham o antigo TTL quando essa regra for removida. Não usar testes obsoletos para reintroduzir expiração.
 - Mudanças apenas documentais dispensam build Android; revisar consistência, caminhos e `git diff --check`.
 - Informar quais verificações foram efetivamente executadas e suas limitações. O relatório histórico registra problema de loopback no Gradle; isso não prova que o ambiente atual falha nem que o build está aprovado.

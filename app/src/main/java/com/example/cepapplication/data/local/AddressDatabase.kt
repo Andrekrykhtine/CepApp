@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [AddressEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AddressDatabase : RoomDatabase() {
@@ -18,7 +18,7 @@ abstract class AddressDatabase : RoomDatabase() {
     companion object {
         private const val DATABASE_NAME = "addresses.db"
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     """
@@ -54,7 +54,7 @@ abstract class AddressDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "ALTER TABLE addresses " +
@@ -63,10 +63,32 @@ abstract class AddressDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE addresses " +
+                        "ADD COLUMN last_consultation_order INTEGER NOT NULL DEFAULT 0",
+                )
+                val ids = database.query(
+                    "SELECT id FROM addresses ORDER BY saved_at_epoch_millis ASC, id ASC",
+                ).use { cursor ->
+                    buildList {
+                        while (cursor.moveToNext()) add(cursor.getLong(0))
+                    }
+                }
+                ids.forEachIndexed { index, id ->
+                    database.execSQL(
+                        "UPDATE addresses SET last_consultation_order = ? WHERE id = ?",
+                        arrayOf(index.toLong() + 1, id),
+                    )
+                }
+            }
+        }
+
         fun create(context: Context): AddressDatabase = Room.databaseBuilder(
             context.applicationContext,
             AddressDatabase::class.java,
             DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
     }
 }

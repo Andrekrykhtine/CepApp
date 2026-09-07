@@ -43,7 +43,9 @@ Preservar a separação entre UI, domínio e dados. A UI não deve acessar Retro
 - Ao alterar o schema Room, fornecer migração compatível; não apagar o banco nem adotar migração destrutiva para contornar incompatibilidade.
 - Não confundir data de obtenção remota com a última consulta bem-sucedida. O formato de persistência pode ser definido na implementação, respeitando o FRD.
 - Manter operações assíncronas com Coroutines, coleta vinculada ao ciclo de vida e propagação de cancelamento. Não converter `CancellationException` em falha de negócio.
-- Preservar o bloqueio de campo/botão durante a consulta e evitar que respostas antigas substituam indevidamente o resultado atual.
+- Preservar o bloqueio de campo/botão durante a consulta (RF-007). Por decisão do usuário em 07/09/2026, o fluxo do app não contempla consultas simultâneas: não acrescentar mutex, serialização no repositório, guardas adicionais no ViewModel, segunda leitura antes do salvamento ou testes específicos para proteger contra consultas simultâneas.
+- Manter a unicidade do CEP e a atomicidade do salvamento/registro de recência. A exclusão de proteções para consultas simultâneas não elimina essas garantias de persistência.
+- Impedir que a restauração inicial atrasada sobrescreva o estado de uma pesquisa iniciada depois dela. Essa leitura automática não constitui uma segunda consulta do usuário.
 
 ## Validação das alterações
 

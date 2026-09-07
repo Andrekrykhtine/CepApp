@@ -98,6 +98,8 @@ A recência da última consulta bem-sucedida deve persistir entre sessões para 
 
 O último resultado visível pode coexistir com um erro de uma nova tentativa. Os nomes de estado refletem o projeto existente; a implementação pode preservar esse resultado separadamente sem criar novas telas. Uma eventual emissão transitória de `Loading` antes da validação não autoriza acesso a dados para CEP inválido.
 
+O fluxo considera uma consulta do usuário por vez, mantendo o bloqueio de campo e botão de RF-007. A restauração inicial é uma leitura automática: se terminar após o início de uma pesquisa, não deve sobrescrever o estado dessa pesquisa.
+
 ## 7. Edge cases e tratamento de erros
 
 | Cenário | Comportamento esperado | Mensagem existente |
@@ -129,12 +131,14 @@ Preservar as mensagens e os mecanismos de apresentação existentes. Não adicio
 - Novos botões para atualizar, excluir, editar ou salvar separadamente; favoritos e sincronização entre dispositivos.
 - Autenticação, perfis e permissões adicionais.
 - Histórico com uma linha por tentativa: a lista continua contendo um registro por CEP.
+- Proteções e testes específicos para consultas simultâneas: mutex, serialização no repositório, guardas adicionais no ViewModel e segunda leitura antes do salvamento motivada por inserções concorrentes. Essa exclusão não altera RF-007 nem as garantias de unicidade e atomicidade da persistência.
 
 ## 9. Premissas e dependências
 
 - Manter o aplicativo Android existente e a estrutura de UI, domínio e dados apresentada no projeto/diagrama.
 - Retrofit + Coroutines, StateFlow e Room são restrições técnicas herdadas do projeto e confirmadas no escopo; este FRD não determina o desenho detalhado das alterações.
 - Preservar as telas XML, ViewBinding, Activity/Fragments e navegação existentes.
+- Por decisão explícita do usuário em 07/09/2026, o app não contempla consultas simultâneas no fluxo de uso. O planejamento deve retirar as proteções propostas para esse cenário, preservando o bloqueio dos controles durante a consulta e o tratamento da restauração inicial atrasada.
 - A consulta remota depende de conexão e da disponibilidade da ViaCEP. A consulta local depende do armazenamento do dispositivo.
 - Preservar endereços existentes ao evoluir a persistência. A última consulta real anterior à implementação não pode ser reconstruída se não foi registrada; usar a ordenação legada como base inicial, passando a registrar corretamente as novas consultas. Essa é uma premissa de compatibilidade, não uma informação histórica recuperada.
 - O armazenamento sem expiração pode manter um endereço antigo indefinidamente; esse comportamento resulta da decisão explícita de chamar a API somente para CEPs novos.
@@ -156,6 +160,7 @@ Não há decisão funcional bloqueante para o fluxo aprovado. Detalhes de schema
 8. Durante a consulta, manter os controles de entrada desabilitados e o progresso visível; liberá-los ao concluir.
 9. Consultas atendidas localmente funcionam sem internet, sem aviso de cache e sem expiração.
 10. Abrir a lista ou restaurar o endereço inicial não muda a ordem do histórico.
+11. Uma restauração inicial que termine após o início de uma pesquisa não sobrescreve o estado dessa pesquisa.
 
 ## 12. Diferenças a implementar
 
@@ -168,3 +173,7 @@ Não há decisão funcional bloqueante para o fluxo aprovado. Detalhes de schema
 | Documentação anterior | README descreve validade de 24 horas. | Atualizar ao implementar, distinguindo documentação histórica e regra vigente. |
 
 Os demais comportamentos aprovados devem ser preservados. Esta lista é orientação de escopo, não indicação de alterações já realizadas.
+
+## 13. Registro de decisões posteriores
+
+- **07/09/2026 — Planejamento do Blueprint:** o usuário esclareceu que não há consultas simultâneas no fluxo do app e solicitou retirar as proteções propostas para esse cenário. Foram excluídos do planejamento mutex/serialização, guardas adicionais para pesquisas concorrentes, segunda leitura defensiva antes do salvamento e testes de consultas simultâneas. Permanecem RF-007, a unicidade do CEP, a atomicidade do salvamento e da recência e a proteção contra restauração inicial atrasada. Esta revisão é documental e não representa implementação ou aprovação das demais propostas técnicas do Blueprint.

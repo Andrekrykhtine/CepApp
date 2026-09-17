@@ -1,134 +1,71 @@
-# AGENTS.md
+# Orientações para trabalhar neste projeto
 
-## Visao geral do projeto
+## Contexto e referência funcional
 
-O **Cep Application** e um aplicativo Android de modulo unico para entrada, validacao, formatacao e persistencia local do ultimo CEP informado pelo usuario. A interface aplica a mascara `00000-000`, rejeita valores incompletos, salva os oito digitos normalizados no Room Database e restaura o valor formatado nas proximas execucoes.
+Aplicativo Android em Kotlin para consultar endereços por CEP na ViaCEP, armazená-los no dispositivo e listar os CEPs consultados.
 
-Este arquivo se aplica a todo o repositorio. Preserve as decisoes abaixo ao alterar o projeto.
+- Leia `docs/consulta-cep/frd-consulta-cep.md` antes de alterar o fluxo de consulta ou persistência. Esse documento contém o escopo aprovado em 07/09/2026.
+- O FRD descreve o comportamento desejado; sua existência não significa que todas as mudanças estejam implementadas.
+- `docs/consulta-cep/hardening-consulta-cep.md` é um registro histórico. O README e o código ainda podem descrever o TTL de 24 horas, substituído pela decisão do FRD.
+- Instruções explícitas posteriores do usuário prevalecem. Registre mudanças de escopo nos documentos correspondentes, sem transformar sugestões em requisitos aprovados.
+- Comunique-se e escreva documentação do projeto em português.
 
-## Stack vigente
+## Regras aprovadas que devem orientar mudanças
 
-- Android Gradle Plugin 9.3.1 e Gradle Wrapper 9.5.0.
-- Gradle Kotlin DSL e catalogo de versoes em `gradle/libs.versions.toml`.
-- JVM do Gradle 21; compatibilidade de fonte e bytecode Java 11.
-- Android `compileSdk` 37, `targetSdk` 36 e `minSdk` 24.
-- Kotlin integrado ao toolchain Android, com `kotlin.code.style=official`.
-- UI tradicional com layouts XML, Material Components, AppCompat, ConstraintLayout e ViewBinding.
-- Estado de tela com AndroidX ViewModel, `StateFlow` e coroutines ligadas ao ciclo de vida.
-- Persistencia local com Room Database encapsulado por uma interface de repositorio.
-- Testes locais com JUnit 4.13.2; infraestrutura de testes instrumentados com AndroidX JUnit e Espresso.
+- Entrada por CEP; não implementar pesquisa por nome ou endereço.
+- Preservar as telas e o fluxo existentes, incluindo máscara, limpeza da entrada após sucesso e resultado anterior visível após falha.
+- Validar/normalizar antes de consultar dados.
+- Consultar Room primeiro. CEP existente deve retornar localmente, sem expiração, sem acesso remoto e sem aviso de cache.
+- Consultar ViaCEP somente para CEP ausente localmente e salvar automaticamente o sucesso, sem duplicar o CEP.
+- Registrar a última consulta bem-sucedida também em cache hit. Essa recência governa a lista e o endereço restaurado ao abrir o app.
+- Abrir telas ou restaurar o último endereço não conta como nova consulta.
+- HTTP 500 para CEP novo deve produzir erro e preservar o resultado anterior visível. Não apresentar esse resultado anterior como se pertencesse ao CEP que falhou.
+- Não acrescentar novas telas, campos, exclusão, atualização manual, expiração ou atualização em segundo plano sem alteração explícita do escopo.
 
-## Estrutura e responsabilidades
+## Organização do código
 
-```text
-CepApplication/
-|-- app/
-|   |-- build.gradle.kts                 # Configuracao do modulo Android
-|   `-- src/
-|       |-- main/
-|       |   |-- AndroidManifest.xml
-|       |   |-- java/com/example/cepapplication/
-|       |   |   |-- MainActivity.kt     # Composicao e renderizacao da UI
-|       |   |   |-- data/               # Contratos e implementacoes de persistencia
-|       |   |   |-- domain/             # Regras puras de dominio
-|       |   |   `-- ui/                 # Estado e ViewModels
-|       |   `-- res/                    # Layouts, strings, temas e demais recursos
-|       `-- test/java/...               # Testes unitarios locais, espelhando os pacotes
-|-- docs/                               # Relatorios e documentacao tecnica
-|-- gradle/libs.versions.toml           # Versoes e aliases de dependencias
-|-- build.gradle.kts                    # Plugins compartilhados do projeto
-`-- settings.gradle.kts                 # Modulos e repositorios permitidos
-```
+Fontes principais em `app/src/main/java/com/example/cepapplication/`:
 
-Mantenha as responsabilidades atuais:
+- `MainActivity.kt`, `SearchFragment.kt`, `SavedAddressesFragment.kt`: navegação, eventos e renderização da UI.
+- `ui/`: ViewModel e estado da consulta via StateFlow.
+- `domain/`: entidade `Address`, contratos de repositório, casos de uso e validação/formatação de CEP. Manter livre de Android, Retrofit e Room.
+- `data/remote/` e `data/ViaCepApi.kt`, `data/ViaCepService.kt`: acesso à ViaCEP com Retrofit e funções suspensas.
+- `data/local/`: Room, DAO, entidade, migrações e fonte local.
+- `data/repository/`: coordenação do acesso local/remoto conforme o FRD.
+- `AppContainer.kt` e `CepApplication.kt`: composição manual de dependências existente.
+- `app/src/main/res/`: layouts XML, navegação e textos. Manter mensagens em recursos de strings.
 
-- `MainActivity` conecta views, eventos e ciclo de vida; nao deve conter regras de dominio nem acesso direto a persistencia.
-- `ui` concentra o estado imutavel da tela e a orquestracao no `ViewModel`.
-- `domain` contem logica Kotlin pura, deterministica e independente do Android.
-- `data` expoe contratos de repositorio e isola APIs de armazenamento Android.
-- `res` e a fonte para textos visiveis, cores, dimensoes, temas e layouts.
+Preservar a separação entre UI, domínio e dados. A UI não deve acessar Retrofit ou DAO diretamente. Manter o contrato do repositório no domínio, conforme o código existente. Não introduzir framework de injeção ou reestruturar a stack sem necessidade do trabalho solicitado.
 
-## Convencoes obrigatorias
+## Persistência e execução assíncrona
 
-- Escreva codigo Kotlin seguindo o estilo oficial e a formatacao existente: quatro espacos, tipos e classes em `PascalCase`, funcoes e propriedades em `camelCase` e constantes em `UPPER_SNAKE_CASE`.
-- Use nomes de recursos Android em `lower_snake_case`, descritivos pela intencao e nao apenas pelo tipo visual.
-- Coloque todo texto exibido ao usuario em `res/values/strings.xml`; nao use strings visiveis hardcoded em Kotlin ou XML.
-- Centralize versoes e aliases de novas dependencias em `gradle/libs.versions.toml`.
-- Preserve o namespace raiz `com.example.cepapplication` e organize novos arquivos pela responsabilidade (`data`, `domain` ou `ui`).
-- Modele o estado de tela com `data class` imutavel e exponha fluxos somente leitura. Mutacoes pertencem ao `ViewModel`.
-- Injete dependencias por construtor. Para dependencias do `ViewModel`, use uma `ViewModelProvider.Factory` enquanto o projeto nao adotar deliberadamente uma biblioteca de injecao.
-- Prefira funcoes puras para formatacao e validacao. Regras de CEP devem permanecer centralizadas no dominio e nao ser duplicadas na Activity ou no layout.
-- Use ViewBinding para acessar views; nao introduza `findViewById`.
-- Colete fluxos respeitando o ciclo de vida, com `repeatOnLifecycle` ou mecanismo AndroidX equivalente.
-- Testes locais ficam em `app/src/test/java` no pacote correspondente. Nomeie os metodos de teste como frases de comportamento entre crases e cubra sucesso, falha e casos-limite relevantes.
-- Commits existentes seguem o formato `<tipo>: <descricao>` (por exemplo, `feat:`, `fix:` e `docs:`); mantenha esse padrao ao criar commits solicitados.
+- Preservar dados existentes e a unicidade do CEP normalizado.
+- Ao alterar o schema Room, fornecer migração compatível; não apagar o banco nem adotar migração destrutiva para contornar incompatibilidade.
+- Não confundir data de obtenção remota com a última consulta bem-sucedida. O formato de persistência pode ser definido na implementação, respeitando o FRD.
+- Manter operações assíncronas com Coroutines, coleta vinculada ao ciclo de vida e propagação de cancelamento. Não converter `CancellationException` em falha de negócio.
+- Preservar o bloqueio de campo/botão durante a consulta (RF-007). Por decisão do usuário em 07/09/2026, o fluxo do app não contempla consultas simultâneas: não acrescentar mutex, serialização no repositório, guardas adicionais no ViewModel, segunda leitura antes do salvamento ou testes específicos para proteger contra consultas simultâneas.
+- Manter a unicidade do CEP e a atomicidade do salvamento/registro de recência. A exclusão de proteções para consultas simultâneas não elimina essas garantias de persistência.
+- Impedir que a restauração inicial atrasada sobrescreva o estado de uma pesquisa iniciada depois dela. Essa leitura automática não constitui uma segunda consulta do usuário.
 
-## Decisoes arquiteturais a preservar
+## Validação das alterações
 
-- **Um unico modulo `app`:** o tamanho atual nao justifica modularizacao adicional. Nao crie novos modulos sem uma necessidade concreta aprovada.
-- **Layouts XML em vez de Compose:** a tela vigente usa ViewBinding e recursos XML. Nao migre para Jetpack Compose de forma incidental.
-- **Separacao leve por camadas:** Activity, ViewModel, dominio puro e repositorio fornecem testabilidade sem impor uma arquitetura excessiva. Evite adicionar use cases, frameworks ou camadas vazias sem ganho demonstravel.
-- **Fonte unica de estado na UI:** `CepUiState` e o estado renderizado, exposto pelo `CepViewModel` via `StateFlow`.
-- **Persistencia simples e local:** `RoomCepRepository` persiste o unico CEP em uma tabela de linha unica. Nao substitua por outro banco de dados, DataStore ou servico remoto sem requisito explicito.
-- **CEP persistido normalizado:** grave somente os oito digitos; aplique a mascara apenas na entrada e na exibicao.
-- **Repositorio como fronteira:** codigo de UI e dominio nao deve depender diretamente de Room.
-- **Dependencias somente de `google()` e `mavenCentral()`:** `settings.gradle.kts` proibe repositorios declarados em modulos.
-
-## Regras para agentes
-
-Antes de editar:
-
-1. Leia `README.md`, os arquivos Gradle relevantes e o codigo da area afetada.
-2. Verifique `git status --short` e preserve alteracoes preexistentes do usuario.
-3. Consulte a documentacao em `docs/` quando a mudanca tocar uma regra ja registrada.
-
-Ao implementar:
-
-- Faca a menor alteracao coerente com o pedido e com a arquitetura vigente.
-- Atualize ou adicione testes para toda alteracao observavel de regra, estado ou persistencia.
-- Mantenha a logica Android fora dos testes unitarios locais sempre que uma abstracao ou funcao pura for suficiente.
-- Reutilize recursos e componentes existentes antes de criar duplicacoes.
-- Atualize a documentacao quando comandos, estrutura ou comportamento documentado mudarem.
-- Nao altere IDs de recursos, package name, SDKs, dependencias ou formatos persistidos sem considerar compatibilidade e atualizar todos os consumidores.
-
-Nao faca:
-
-- Nao reverta, apague nem reformate alteracoes fora do escopo.
-- Nao edite artefatos gerados em `build/` ou `.gradle/`.
-- Nao adicione bibliotecas, plugins, repositorios Maven ou ferramentas arquiteturais sem necessidade clara.
-- Nao mova regra de negocio para Activity, XML ou implementacoes de persistencia.
-- Nao introduza chamadas de rede, permissoes Android, analytics ou coleta de dados sem requisito explicito.
-- Nao considere a tarefa concluida se os testes ou o build relevante estiverem falhando; informe claramente qualquer bloqueio ambiental.
-
-## Execucao local
-
-Pre-requisitos:
-
-- Android Studio compativel com AGP 9.3.1 e Android SDK instalado.
-- JDK 21 para o daemon do Gradle.
-- Android SDK 37 para compilacao.
-- Dispositivo ou emulador com Android 7.0 (API 24) ou superior para executar o app.
-
-No Windows PowerShell:
+Use o Gradle Wrapper do repositório. No PowerShell, conforme o escopo da alteração:
 
 ```powershell
-.\gradlew.bat assembleDebug
 .\gradlew.bat testDebugUnitTest
-.\gradlew.bat lintDebug
+.\gradlew.bat assembleDebug
 ```
 
-Em macOS ou Linux:
+- A validação padrão deste projeto não exige aparelho, emulador, ADB ou `connectedDebugAndroidTest`. Testes instrumentados em `app/src/androidTest/` podem permanecer como cobertura complementar, mas não são condição de aceite nem precisam ser executados para concluir uma alteração.
+- Para mudanças de cache e histórico, verificar nos testes automatizados executáveis retorno local sem rede independentemente da idade, cache miss com salvamento, ausência de duplicatas, recência em consultas locais e preservação de histórico após falhas.
+- Atualizar testes que imponham o antigo TTL quando essa regra for removida. Não usar testes obsoletos para reintroduzir expiração.
+- Mudanças apenas documentais dispensam build Android; revisar consistência, caminhos e `git diff --check`.
+- Informar quais verificações foram efetivamente executadas e suas limitações. O relatório histórico registra problema de loopback no Gradle; isso não prova que o ambiente atual falha nem que o build está aprovado.
+- Não atualizar dependências, SDK ou ferramentas apenas para acompanhar versões recentes. Consultar os arquivos Gradle e o catálogo `gradle/libs.versions.toml` para a configuração vigente.
 
-```bash
-./gradlew assembleDebug
-./gradlew testDebugUnitTest
-./gradlew lintDebug
-```
+## Entrega e documentação
 
-Para uma verificacao local proporcional a maioria das mudancas, execute os testes unitarios e o build de debug:
-
-```powershell
-.\gradlew.bat testDebugUnitTest assembleDebug
-```
-
-Mudancas de interface ou integracao Android tambem devem ser verificadas em emulador/dispositivo. Quando existirem testes instrumentados aplicaveis, execute `connectedDebugAndroidTest` com um dispositivo conectado.
+- Fazer alterações proporcionais ao pedido e preservar modificações do usuário.
+- Ao implementar o FRD, atualizar documentação ativa e informar o que foi implementado, testado ou permaneceu pendente.
+- Não reescrever resultados de validação históricos como se fossem verificações atuais.
+- Manter documentos desta funcionalidade em `docs/consulta-cep/`.

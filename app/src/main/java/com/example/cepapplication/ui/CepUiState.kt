@@ -1,7 +1,13 @@
 package com.example.cepapplication.ui
 
-data class CepUiState(
-    val inputZipCode: String = "",
-    val savedZipCode: String? = null,
-    val isZipCodeInvalid: Boolean = false
-)
+import com.example.cepapplication.domain.model.Address
+
+sealed interface CepUiState {
+    data object Idle : CepUiState
+
+    data object Loading : CepUiState
+
+    data class Success(val address: Address) : CepUiState
+
+    data class Error(val cause: Throwable) : CepUiState
+}

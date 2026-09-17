@@ -3,77 +3,61 @@ package com.example.cepapplication.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.cepapplication.data.CepRepository
-import com.example.cepapplication.domain.CepFormatter
-import kotlinx.coroutines.flow.MutableSharedFlow
+import com.example.cepapplication.domain.model.Address
+import com.example.cepapplication.domain.usecase.GetAddressByCepUseCase
+import com.example.cepapplication.domain.usecase.GetSavedAddressesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class CepViewModel(
-    private val repository: CepRepository
+    private val getAddressByCep: GetAddressByCepUseCase,
+    private val getSavedAddresses: GetSavedAddressesUseCase,
 ) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(CepUiState())
+    private val _uiState = MutableStateFlow<CepUiState>(CepUiState.Idle)
     val uiState: StateFlow<CepUiState> = _uiState.asStateFlow()
-    private val _events = MutableSharedFlow<CepUiEvent>()
-    val events: SharedFlow<CepUiEvent> = _events.asSharedFlow()
 
-    init {
+    val savedAddresses: StateFlow<List<Address>> = getSavedAddresses()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+            initialValue = emptyList(),
+        )
+
+    fun search(rawZipCode: String) {
         viewModelScope.launch {
-            _uiState.update { currentState ->
-                currentState.copy(
-                    savedZipCode = repository.getSavedZipCode()?.let(CepFormatter::format)
-                )
-            }
-        }
-    }
-
-    fun onZipCodeChanged(value: String) {
-        _uiState.update { currentState ->
-            currentState.copy(
-                inputZipCode = CepFormatter.format(value),
-                isZipCodeInvalid = false
+            _uiState.value = CepUiState.Loading
+            _uiState.value = getAddressByCep(rawZipCode).fold(
+                onSuccess = CepUiState::Success,
+                onFailure = CepUiState::Error,
             )
         }
     }
 
-    fun saveZipCode() {
-        val currentInput = _uiState.value.inputZipCode
-        if (!CepFormatter.isValid(currentInput)) {
-            _uiState.update { currentState ->
-                currentState.copy(isZipCodeInvalid = true)
-            }
-            return
-        }
+    fun loadLatestAddress() {
+        if (_uiState.value != CepUiState.Idle) return
 
-        val normalizedZipCode = CepFormatter.normalize(currentInput)
         viewModelScope.launch {
-            repository.saveZipCode(normalizedZipCode)
-            _uiState.update { currentState ->
-                currentState.copy(
-                    inputZipCode = "",
-                    savedZipCode = CepFormatter.format(normalizedZipCode),
-                    isZipCodeInvalid = false
-                )
+            getSavedAddresses().first().firstOrNull()?.let { address ->
+                _uiState.value = CepUiState.Success(address)
             }
-            _events.emit(CepUiEvent.ZipCodeSaved)
         }
     }
+}
 
-    class Factory(
-        private val repository: CepRepository
-    ) : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            require(modelClass.isAssignableFrom(CepViewModel::class.java)) {
-                "Unknown ViewModel class: ${modelClass.name}"
-            }
-            return CepViewModel(repository) as T
+class CepViewModelFactory(
+    private val getAddressByCep: GetAddressByCepUseCase,
+    private val getSavedAddresses: GetSavedAddressesUseCase,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        require(modelClass.isAssignableFrom(CepViewModel::class.java)) {
+            "ViewModel não suportado: ${modelClass.name}"
         }
+        return CepViewModel(getAddressByCep, getSavedAddresses) as T
     }
 }

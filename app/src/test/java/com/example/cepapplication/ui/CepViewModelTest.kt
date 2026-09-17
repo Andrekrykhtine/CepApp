@@ -1,73 +1,77 @@
 package com.example.cepapplication.ui
 
-import com.example.cepapplication.data.CepRepository
-import kotlinx.coroutines.CoroutineStart
+import com.example.cepapplication.domain.model.Address
+import com.example.cepapplication.domain.repository.CepRepository
+import com.example.cepapplication.domain.usecase.GetAddressByCepUseCase
+import com.example.cepapplication.domain.usecase.GetSavedAddressesUseCase
+import com.example.cepapplication.domain.usecase.InvalidCepException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CepViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun `loads and formats the saved zip code`() = runTest {
-        val viewModel = CepViewModel(FakeCepRepository("12345678"))
-        advanceUntilIdle()
+    fun `moves from loading to success when address is found`() = runTest {
+        val deferredAddress = CompletableDeferred<Address?>()
+        val repository = FakeCepRepository(lookup = { _ -> deferredAddress.await() })
+        val viewModel = createViewModel(repository)
 
-        assertEquals("12345-678", viewModel.uiState.value.savedZipCode)
+        viewModel.search("01001-000")
+        runCurrent()
+        assertEquals(CepUiState.Loading, viewModel.uiState.value)
+
+        val address = address()
+        deferredAddress.complete(address)
+        advanceUntilIdle()
+        assertEquals(CepUiState.Success(address), viewModel.uiState.value)
     }
 
     @Test
-    fun `invalid zip code exposes validation error and is not persisted`() = runTest {
-        val repository = FakeCepRepository()
-        val viewModel = CepViewModel(repository)
+    fun `moves to error with identifiable cause when zip code is invalid`() = runTest {
+        val viewModel = createViewModel(FakeCepRepository(lookup = { _ -> address() }))
 
-        viewModel.onZipCodeChanged("123")
-        viewModel.saveZipCode()
+        viewModel.search("01001-00")
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.isZipCodeInvalid)
-        assertNull(repository.persistedZipCode)
+        val state = viewModel.uiState.value
+        assertTrue(state is CepUiState.Error)
+        assertTrue((state as CepUiState.Error).cause is InvalidCepException)
     }
 
-    @Test
-    fun `valid zip code is persisted and reflected in the state`() = runTest {
-        val repository = FakeCepRepository()
-        val viewModel = CepViewModel(repository)
-        val emittedEvent = async(start = CoroutineStart.UNDISPATCHED) {
-            viewModel.events.first()
-        }
-
-        viewModel.onZipCodeChanged("12345678")
-        viewModel.saveZipCode()
-        advanceUntilIdle()
-
-        assertEquals("12345678", repository.persistedZipCode)
-        assertEquals("12345-678", viewModel.uiState.value.savedZipCode)
-        assertEquals("", viewModel.uiState.value.inputZipCode)
-        assertEquals(CepUiEvent.ZipCodeSaved, emittedEvent.await())
-    }
+    private fun createViewModel(repository: CepRepository) = CepViewModel(
+        getAddressByCep = GetAddressByCepUseCase(repository),
+        getSavedAddresses = GetSavedAddressesUseCase(repository),
+    )
 
     private class FakeCepRepository(
-        initialZipCode: String? = null
+        private val lookup: suspend (String) -> Address?,
+        private val storedAddresses: MutableStateFlow<List<Address>> = MutableStateFlow(emptyList()),
     ) : CepRepository {
-        var persistedZipCode: String? = initialZipCode
-            private set
+        override suspend fun getAddress(zipCode: String): Address? = lookup(zipCode)
 
-        override suspend fun getSavedZipCode(): String? = persistedZipCode
-
-        override suspend fun saveZipCode(zipCode: String) {
-            persistedZipCode = zipCode
-        }
+        override fun observeSavedAddresses(): Flow<List<Address>> = storedAddresses.asStateFlow()
     }
+
+    private fun address() = Address(
+        zipCode = "01001000",
+        street = "Praça da Sé",
+        complement = "lado ímpar",
+        neighborhood = "Sé",
+        city = "São Paulo",
+        stateAbbreviation = "SP",
+        state = "São Paulo",
+    )
 }

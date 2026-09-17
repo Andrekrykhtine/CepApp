@@ -7,7 +7,7 @@
     <dimen name="margin_large">32dp</dimen>
     <dimen name="margin_huge">60dp</dimen>
 
-    <dimen name="padding_toolbar">20dp</dimen>
+    <dimen name="padding_toolbar">32dp</dimen>
 
     <!-- Text Sizes -->
     <dimen name="text_small">14sp</dimen>

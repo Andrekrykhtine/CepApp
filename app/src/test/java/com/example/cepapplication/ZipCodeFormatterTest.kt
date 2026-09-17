@@ -33,4 +33,9 @@ class ZipCodeFormatterTest {
     fun `keeps an incomplete zip code without separator`() {
         assertEquals("01001", CepFormatter.format("01001"))
     }
+
+    @Test
+    fun `formats pasted text with letters excess digits and leading zeroes`() {
+        assertEquals("00123-456", CepFormatter.format("a00123b456789"))
+    }
 }

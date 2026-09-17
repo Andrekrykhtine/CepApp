@@ -17,7 +17,6 @@ android {
         targetSdk = 36
 
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -34,6 +33,10 @@ android {
 
     buildFeatures {
         viewBinding = true
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -59,9 +62,9 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.recyclerview)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
+    testImplementation(libs.robolectric)
 }

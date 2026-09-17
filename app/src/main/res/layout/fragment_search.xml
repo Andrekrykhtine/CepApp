@@ -33,7 +33,6 @@
         android:layout_marginEnd="@dimen/margin_standard"
         android:hint="@string/hint_text"
         android:inputType="number"
-        android:maxLength="9"
         android:textSize="@dimen/text_large"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

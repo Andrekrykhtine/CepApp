@@ -4,8 +4,8 @@ import android.database.sqlite.SQLiteConstraintException
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import java.util.UUID
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -14,9 +14,9 @@ import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
 class AddressDatabaseMigrationTest {
-    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val context = RuntimeEnvironment.getApplication()
     private val databaseNames = mutableListOf<String>()
 
     @After
@@ -81,6 +81,23 @@ class AddressDatabaseMigrationTest {
             }
             openRoom(name).use { room ->
                 assertEquals(expected, readAddresses(room.openHelper.writableDatabase))
+                kotlinx.coroutines.runBlocking {
+                    var remoteCalls = 0
+                    val repository = com.example.cepapplication.data.repository.CepRepositoryImpl(
+                        RoomCepLocalDataSource(room.addressDao()),
+                        object : com.example.cepapplication.data.remote.CepRemoteDataSource {
+                            override suspend fun findByZipCode(zipCode: String): com.example.cepapplication.domain.model.Address? {
+                                remoteCalls++
+                                throw java.io.IOException("offline")
+                            }
+                        },
+                    )
+                    val cep = expected.last().zipCode
+                    assertEquals(cep, repository.getAddress(cep)?.zipCode)
+                    assertEquals(0, remoteCalls)
+                    assertEquals(cep, readAddresses(room.openHelper.writableDatabase).first().zipCode)
+                    assertEquals(expected.size, readAddresses(room.openHelper.writableDatabase).size)
+                }
             }
         }
     }
@@ -196,3 +213,6 @@ class AddressDatabaseMigrationTest {
         val order: Long,
     )
 }
+
+private inline fun <T> AddressDatabase.use(block: (AddressDatabase) -> T): T =
+    try { block(this) } finally { close() }

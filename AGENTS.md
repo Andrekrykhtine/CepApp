@@ -56,7 +56,7 @@ Use o Gradle Wrapper do repositório. No PowerShell, conforme o escopo da altera
 .\gradlew.bat assembleDebug
 ```
 
-- A validação padrão deste projeto não exige aparelho, emulador, ADB ou `connectedDebugAndroidTest`. Testes instrumentados em `app/src/androidTest/` podem permanecer como cobertura complementar, mas não são condição de aceite nem precisam ser executados para concluir uma alteração.
+- Este projeto não mantém testes instrumentados: não usar aparelho, emulador, ADB ou `connectedDebugAndroidTest` na validação. Cobertura automatizada deve ser executável por testes unitários locais.
 - Para mudanças de cache e histórico, verificar nos testes automatizados executáveis retorno local sem rede independentemente da idade, cache miss com salvamento, ausência de duplicatas, recência em consultas locais e preservação de histórico após falhas.
 - Atualizar testes que imponham o antigo TTL quando essa regra for removida. Não usar testes obsoletos para reintroduzir expiração.
 - Mudanças apenas documentais dispensam build Android; revisar consistência, caminhos e `git diff --check`.

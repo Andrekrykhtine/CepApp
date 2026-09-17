@@ -1,23 +1,22 @@
 package com.example.cepapplication.data
 
-import android.content.Context
 import androidx.room.Room
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
 class CepDatabaseTest {
     private lateinit var database: CepDatabase
 
     @Before
     fun createDatabase() {
-        val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = RuntimeEnvironment.getApplication()
         database = Room.inMemoryDatabaseBuilder(context, CepDatabase::class.java).build()
     }
 

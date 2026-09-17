@@ -39,6 +39,20 @@ class GetAddressByCepUseCaseTest {
         assertTrue(result.exceptionOrNull() is CepNotFoundException)
     }
 
+    @Test
+    fun `returns repository failures without changing their type`() = runBlocking {
+        val failure = IllegalStateException("falha de armazenamento")
+        val repository = object : CepRepository {
+            override suspend fun getAddress(zipCode: String): Address? = throw failure
+
+            override fun observeSavedAddresses(): Flow<List<Address>> = flowOf(emptyList())
+        }
+
+        val result = GetAddressByCepUseCase(repository)("01001000")
+
+        assertEquals(failure, result.exceptionOrNull())
+    }
+
     @Test(expected = CancellationException::class)
     fun `does not convert coroutine cancellation into result failure`() = runBlocking<Unit> {
         val repository = object : CepRepository {

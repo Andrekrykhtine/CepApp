@@ -1,32 +1,38 @@
 package com.example.cepapplication.data.local
 
 import com.example.cepapplication.domain.model.Address
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 class RoomCepLocalDataSource(
     private val addressDao: AddressDao,
 ) : CepLocalDataSource {
-    override suspend fun findAndRecordConsultation(zipCode: String): Address? =
+    override suspend fun findAndRecordConsultation(zipCode: String): Address? = localOperation {
         addressDao.findAndRecordConsultation(zipCode)?.toDomain()
-
-    override suspend fun saveAndRecordConsultation(address: Address, savedAtEpochMillis: Long): Address {
-        addressDao.saveAndRecordConsultation(address, savedAtEpochMillis)
-        return address
     }
 
-    override suspend fun findByZipCode(zipCode: String): CachedAddress? =
-        addressDao.findByZipCode(zipCode)?.let { entity ->
-            CachedAddress(
-                address = entity.toDomain(),
-                savedAtEpochMillis = entity.savedAtEpochMillis,
-            )
+    override suspend fun saveAndRecordConsultation(address: Address, savedAtEpochMillis: Long): Address =
+        localOperation {
+            addressDao.saveAndRecordConsultation(address, savedAtEpochMillis)
+            address
         }
 
-    override suspend fun save(address: Address, savedAtEpochMillis: Long) {
-        saveAndRecordConsultation(address, savedAtEpochMillis)
+    override fun observeAll(): Flow<List<Address>> =
+        addressDao.observeAll()
+            .map { entities -> entities.map(AddressEntity::toDomain) }
+            .catch { error -> throw error.asLocalStorageException() }
+
+    private suspend fun <T> localOperation(operation: suspend () -> T): T = try {
+        operation()
+    } catch (error: Throwable) {
+        throw error.asLocalStorageException()
     }
 
-    override fun observeAll(): Flow<List<Address>> =
-        addressDao.observeAll().map { entities -> entities.map(AddressEntity::toDomain) }
+    private fun Throwable.asLocalStorageException(): Throwable = when (this) {
+        is CancellationException -> this
+        is LocalStorageException -> this
+        else -> LocalStorageException(this)
+    }
 }

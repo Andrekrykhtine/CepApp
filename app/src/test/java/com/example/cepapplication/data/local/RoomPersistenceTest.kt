@@ -1,8 +1,10 @@
 package com.example.cepapplication.data.local
 
 import androidx.room.Room
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
+import androidx.room.withTransaction
+import kotlinx.coroutines.launch
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import com.example.cepapplication.domain.model.Address
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
@@ -17,9 +19,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-@RunWith(AndroidJUnit4::class)
-class RoomCepLocalDataSourceTest {
-    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+@RunWith(RobolectricTestRunner::class)
+class RoomPersistenceTest {
+    private val context = RuntimeEnvironment.getApplication()
     private val databaseName = "local-t002-${UUID.randomUUID()}.db"
     private lateinit var database: AddressDatabase
     private lateinit var source: RoomCepLocalDataSource
@@ -125,18 +127,28 @@ class RoomCepLocalDataSourceTest {
     }
 
     @Test
-    fun salvamentoLegadoTambemRegistraRecencia() = runBlocking {
-        val a = address("01001000")
-        source.save(a, 10)
-        assertEquals(CachedAddress(a, 10), source.findByZipCode(a.zipCode))
-        assertEquals(1L, database.addressDao().maxConsultationOrder())
+    fun cancelamentoAntesDoCommitReverteEscrita() = runBlocking {
+        source.saveAndRecordConsultation(address("01001000"), 0)
+        val before = database.addressDao().observeAll().first()
+        val written = CompletableDeferred<Unit>()
+        val job = launch {
+            database.withTransaction {
+                database.addressDao().saveAndRecordConsultation(address("20040002"), 10)
+                written.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        withTimeout(5_000) { written.await() }
+        job.cancel()
+        job.join()
+        assertEquals(before, database.addressDao().observeAll().first())
     }
 
     private suspend fun expectWriteFailure(operation: suspend () -> Any?) {
         try {
             operation()
             fail("A escrita deveria falhar")
-        } catch (expected: android.database.sqlite.SQLiteException) {
+        } catch (expected: LocalStorageException) {
             // A falha real do SQLite deve atravessar a fonte local.
         }
     }

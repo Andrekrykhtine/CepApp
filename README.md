@@ -1,12 +1,11 @@
 # Cep Application
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 📋 Sobre
 
-O **Cep Application** é um aplicativo Android para consultar endereços pela ViaCEP, armazená-los localmente e visualizá-los posteriormente. O projeto separa interface, regras de negócio e acesso a dados, com cache local e funcionamento offline para endereços já consultados.
+O **Cep Application** é um aplicativo Android para consultar endereços pela ViaCEP, armazená-los localmente e visualizá-los posteriormente. O projeto separa interface, regras de negócio e acesso a dados, com armazenamento local permanente para endereços já consultados e funcionamento offline.
 
 ## 📑 Índice
 
@@ -25,11 +24,18 @@ O **Cep Application** é um aplicativo Android para consultar endereços pela Vi
 - **Máscara Automática**: Formatação em tempo real do CEP (00000-000) durante a digitação.
 - **Consulta ViaCEP**: Busca os dados completos do endereço pela internet.
 - **Persistência Local**: Utiliza Room para manter os endereços entre sessões.
-- **Cache com Validade**: Reutiliza dados locais por 24 horas e tenta atualizá-los depois desse período.
-- **Fallback Offline**: Se a atualização falhar por conexão, mantém disponível o endereço armazenado.
+- **Consulta local prioritária**: CEPs já armazenados são retornados localmente, sem expiração e sem chamada à ViaCEP.
+- **Recência persistente**: Toda consulta bem-sucedida, local ou remota, move o CEP para o início da lista e permite restaurá-lo entre sessões.
+- **Funcionamento offline**: Consultas de CEPs já armazenados não dependem de conexão.
 - **Lista Reativa**: A tela de CEPs armazenados acompanha automaticamente as mudanças do banco.
 - **Validação de Entrada**: Bloqueio de salvamento para CEPs incompletos ou inválidos.
 - **Interface Moderna**: Construída com `Material Design` e `ViewBinding`.
+
+## ✅ Estado da implementação
+
+O comportamento vigente segue o FRD de 07/09/2026: não há TTL de 24 horas, o armazenamento local tem prioridade e a recência representa a última consulta bem-sucedida. A migração de dados legados e os fluxos de persistência são mantidos conforme a implementação atual.
+
+Após as correções da revisão, em 07/09/2026, **80 testes locais passaram e o build debug concluiu** pelo Gradle Wrapper. A suíte inclui Room real, migrações e telas com Robolectric, sem ADB ou emulador. Evidências em [relatório de testes](docs/consulta-cep/test-report-consulta-cep.md) e [validação](docs/consulta-cep/validacao-consulta-cep.md). As tentativas anteriores bloqueadas por ambiente foram preservadas como histórico. Essa execução não certifica a disponibilidade da ViaCEP pública nem o comportamento em hardware.
 
 ## 🛠️ Tecnologias
 

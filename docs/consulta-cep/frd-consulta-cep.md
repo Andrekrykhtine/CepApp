@@ -2,7 +2,7 @@
 
 Data: 07/09/2026  
 Status: escopo aprovado pelo usuário; documento gerado após brainstorming.  
-Implementação: parcialmente existente; as mudanças descritas neste documento ainda precisam ser implementadas.
+Implementação: correções da revisão aprovadas e aplicadas na árvore de trabalho. Em 07/09/2026, 80 testes locais passaram e assembleDebug concluiu; ver test-report-consulta-cep.md e o registro posterior de validação.
 
 ## 1. Visão geral
 
@@ -17,7 +17,7 @@ Este FRD consolida o fluxo completo existente e as mudanças aprovadas, preserva
 - [Documentação oficial ViaCEP](https://viacep.com.br/), consultada em 07/09/2026: consulta por CEP de oito dígitos, resposta JSON e sinalização de CEP inexistente pelo campo `erro`.
 - `docs/consulta-cep/hardening-consulta-cep.md`: registro histórico da implementação, não comprovação de que as novas decisões já foram aplicadas.
 
-O código analisado já utiliza Retrofit, Coroutines, StateFlow e Room. Atualmente, o cache expira após 24 horas e a recuperação do último endereço usa a data de armazenamento/atualização. O comportamento desejado **remove essa expiração** e passa a considerar a **última consulta bem-sucedida**, inclusive local. Essas decisões substituem a regra de 24 horas descrita no README e discutida inicialmente no brainstorming.
+O código analisado utiliza Retrofit, Coroutines, StateFlow e Room. O comportamento vigente **não possui expiração**: um CEP encontrado localmente é retornado sem acesso remoto, e a recuperação do último endereço considera a **última consulta bem-sucedida**, inclusive local. Essas decisões substituem a regra histórica de 24 horas descrita anteriormente no README e discutida inicialmente no brainstorming. A implementação e suas limitações de validação estão registradas em `docs/consulta-cep/validacao-consulta-cep.md`.
 
 ## 2. Atores
 
@@ -172,8 +172,12 @@ Não há decisão funcional bloqueante para o fluxo aprovado. Detalhes de schema
 | Último endereço e lista | Ordenação por salvamento/atualização. | Ordenação persistente por consulta bem-sucedida. |
 | Documentação anterior | README descreve validade de 24 horas. | Atualizar ao implementar, distinguindo documentação histórica e regra vigente. |
 
-Os demais comportamentos aprovados devem ser preservados. Esta lista é orientação de escopo, não indicação de alterações já realizadas.
+Os demais comportamentos aprovados devem ser preservados. As diferenças funcionais desta seção foram implementadas na árvore de trabalho; os testes locais e o build passaram na execução posterior às correções da revisão; a tentativa original da T-011 permanece registrada como histórica.
 
 ## 13. Registro de decisões posteriores
 
 - **07/09/2026 — Planejamento do Blueprint:** o usuário esclareceu que não há consultas simultâneas no fluxo do app e solicitou retirar as proteções propostas para esse cenário. Foram excluídos do planejamento mutex/serialização, guardas adicionais para pesquisas concorrentes, segunda leitura defensiva antes do salvamento e testes de consultas simultâneas. Permanecem RF-007, a unicidade do CEP, a atomicidade do salvamento e da recência e a proteção contra restauração inicial atrasada. Esta revisão é documental e não representa implementação ou aprovação das demais propostas técnicas do Blueprint.
+- **07/09/2026 — Estratégia de testes:** o usuário determinou a retirada dos testes instrumentados dependentes de ADB. O projeto não deve usar aparelho, emulador, ADB ou `connectedDebugAndroidTest` como parte da validação; a cobertura automatizada deve ser mantida em testes unitários locais.
+- **07/09/2026 — Status da implementação:** a documentação ativa foi atualizada pela T-012 para refletir o comportamento sem TTL, a prioridade local e a recência por consulta bem-sucedida. A T-011 registra que os testes unitários e o build ainda precisam ser reexecutados em ambiente com acesso ao Android SDK.
+
+- **07/09/2026 — Correções da revisão:** R-01–R-07 aprovadas pelo usuário e aplicadas; erros de restauração/observação tratados, feedback de falha consumível e cobertura local ampliada. Corrigido o truncamento da colagem antes da máscara, mantendo RF-001/RN-002. Resultado: 80 testes passaram e build debug concluído. O transporte público e hardware não foram exercitados.

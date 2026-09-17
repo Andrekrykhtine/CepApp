@@ -4,10 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.cepapplication.databinding.FragmentSavedAddressesBinding
 import kotlinx.coroutines.launch
 
@@ -15,7 +18,9 @@ class SavedAddressesFragment : Fragment() {
     private var _binding: FragmentSavedAddressesBinding? = null
     private val binding get() = requireNotNull(_binding)
 
-    private val viewModel get() = (requireActivity() as MainActivity).cepViewModel
+    private val viewModel: CepViewModel by activityViewModels {
+        (requireActivity().application as CepApplication).container.cepViewModelFactory
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -28,6 +33,10 @@ class SavedAddressesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.recyclerSavedAddresses.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = SavedAddressesAdapter(requireContext())
+        }
         observeSavedAddresses()
     }
 
@@ -39,16 +48,20 @@ class SavedAddressesFragment : Fragment() {
     private fun observeSavedAddresses() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.savedAddresses.collect { addresses ->
-                    val hasAddresses = addresses.isNotEmpty()
-                    binding.cardSavedAddresses.visibility =
+                viewModel.observeSavedAddresses()
+                viewModel.savedAddressesState.collect { state ->
+                    val hasAddresses = state.addresses.isNotEmpty()
+                    val showEmptyAddresses = state.hasLoaded && !hasAddresses
+                    binding.txtSavedAddressesTitle.visibility =
                         if (hasAddresses) View.VISIBLE else View.GONE
                     binding.txtEmptyAddresses.visibility =
-                        if (hasAddresses) View.GONE else View.VISIBLE
-                    binding.txtSavedAddresses.text =
-                        addresses.joinToString(separator = "\n\n") { address ->
-                            requireContext().formatAddress(address)
-                        }
+                        if (showEmptyAddresses) View.VISIBLE else View.GONE
+                    (binding.recyclerSavedAddresses.adapter as SavedAddressesAdapter)
+                        .submitList(state.addresses)
+                    state.errorFeedbackId?.let { id ->
+                        Toast.makeText(requireContext(), R.string.error_unexpected, Toast.LENGTH_LONG).show()
+                        viewModel.consumeSavedAddressesError(id)
+                    }
                 }
             }
         }

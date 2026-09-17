@@ -2,11 +2,11 @@
 
 Data: 07/09/2026.
 
-Status: planejamento revisado em conversa e criação do documento autorizada pelo usuário. Nenhuma tarefa de implementação foi executada na elaboração deste Blueprint.
+Status atual: correções R-01–R-07 implementadas e validadas em 07/09/2026: 80 testes locais passaram e assembleDebug concluiu. Evidências em test-report-consulta-cep.md e na nova seção de validacao-consulta-cep.md. Os registros anteriores de T-011/T-012 permanecem históricos.
 
 Referência de escopo: FRD de consulta de CEP, incluindo a decisão de 07/09/2026 que exclui proteções para consultas simultâneas. A referência inicial a “Carrinho de Compras” não corresponde à funcionalidade: o usuário confirmou a manutenção do escopo do FRD de CEP.
 
-Este documento consolida o contexto funcional e técnico necessário à execução futura. Os trechos de SQL, contratos e pseudocódigo são especificações de implementação, não código já aplicado. A autorização para criar este documento não autoriza implementar as tarefas.
+Este documento mantém o desenho técnico e os critérios de aceite. A implementação e as correções foram autorizadas em conversa; os resultados efetivos estão nos relatórios datados, não nos pseudocódigos.
 
 ## 1. Contexto
 
@@ -87,13 +87,13 @@ A imagem posiciona a interface do repositório na camada de dados e simplifica a
 | Coroutines Android / testes | 1.11.0 / 1.10.2 |
 | Lifecycle / Navigation | 2.10.0 / 2.10.0 |
 | AppCompat / Material | 1.7.1 / 1.14.0 |
-| JUnit / AndroidX JUnit / Espresso | 4.13.2 / 1.3.0 / 3.7.0 |
+| JUnit / Robolectric | 4.13.2 / 4.16 |
 | UI | Activity, Fragments, XML e ViewBinding |
-| Banco atual | `addresses.db`, versão 3, migrações 1→2 e 2→3, `exportSchema = false` |
+| Banco atual | `addresses.db`, versão 4, migrações 1→2, 2→3 e 3→4, `exportSchema = false` |
 
 Não atualizar dependências, SDK, JDK ou ferramentas apenas para acompanhar versões. Os valores acima são leitura da configuração local, não comprovação de build aprovado. Não se exige exportação retroativa de schemas inexistentes para executar os testes de migração: usar fixtures SQLite e validar a abertura pelo Room real.
 
-### 1.6 Situação atual e mudança planejada
+### 1.6 Baseline anterior à implementação e mudança aprovada
 
 | Situação observada | Destino |
 | --- | --- |
@@ -353,25 +353,25 @@ CEP apresentado é sempre o do endereço renderizado
 
 ## 7. Tarefas de implementação
 
-As tarefas abaixo são planejadas, não executadas. Caminhos reais existentes e caminhos de novos artefatos estão explicitados. Em cada tarefa, executar os testes específicos alterados; a T-011 consolida os comandos completos. Não adicionar testes de consultas simultâneas.
+As tarefas abaixo preservam o desenho e os critérios aprovados; o estado atual é registrado na seção 11.2. Caminhos reais existentes e caminhos de novos artefatos estão explicitados. Em cada tarefa, executar os testes específicos alterados; a T-011 consolida os comandos completos. Não adicionar testes de consultas simultâneas.
 
 ### Fase 1 — Persistência e recência
 
 #### T-001 — Evoluir schema Room e preservar dados
 
 - **O que:** implementar o schema da seção 2 e migração 3→4; preservar migrações anteriores, dados, ids e índice. Materializar ids antes de atribuir ordinais. Manter defaults compatíveis com criação nova. Expor migrações como internal para uso dos testes, sem copiar a lógica.
-- **Onde:** `app/src/main/java/com/example/cepapplication/data/local/AddressEntity.kt` e `AddressDatabase.kt`; novo `app/src/androidTest/java/com/example/cepapplication/data/local/AddressDatabaseMigrationTest.kt`.
+- **Onde:** `app/src/main/java/com/example/cepapplication/data/local/AddressEntity.kt` e `AddressDatabase.kt`; novo `app/src/test/java/com/example/cepapplication/data/local/AddressDatabaseMigrationTest.kt`.
 - **Dependências:** nenhuma.
 - **Aceite:** instalação nova e bancos 1, 2 e 3 abrem em v4; conteúdo/id/índice preservados; ordem legada reproduzida; zero timestamps suportados. RF-005, RF-006, RF-010, RF-011; compatibilidade.
 - **Unitários:** não substituem validação de schema; nenhum teste artificial de SQL em string.
 - **Integração:** fixtures SQLite por versão, bancos vazios/povoados, datas iguais/zero/distintas; abrir com Room real e verificar conteúdo, versão e unicidade. Bancos de teste isolados.
-- **E2E:** preservação após atualização compõe a validação integrada da T-010; migração já é comprovada nos testes instrumentados desta tarefa.
+- **E2E:** preservação após atualização compõe a validação integrada da T-010; migração é verificada por testes locais com Room real sob Robolectric.
 - **Complexidade:** alta.
 
 #### T-002 — Operações locais atômicas e ordenação
 
-- **O que:** implementar transações das seções 6.3/6.4, novos contratos locais e ordenação comum; manter provisoriamente assinaturas antigas necessárias ao repositório até T-003. Inserção ABORT; hit altera só recência. Não incluir releitura defensiva.
-- **Onde:** `app/src/main/java/com/example/cepapplication/data/local/AddressDao.kt`, `CepLocalDataSource.kt`, `RoomCepLocalDataSource.kt` e mapeadores de `AddressEntity.kt`; novo `app/src/androidTest/java/com/example/cepapplication/data/local/RoomCepLocalDataSourceTest.kt`.
+- **O que:** implementar transações das seções 6.3/6.4, novos contratos locais e ordenação comum; contratos antigos foram removidos na integração com T-003. Inserção ABORT; hit altera só recência. Não incluir releitura defensiva.
+- **Onde:** `app/src/main/java/com/example/cepapplication/data/local/AddressDao.kt`, `CepLocalDataSource.kt`, `RoomCepLocalDataSource.kt` e mapeadores de `AddressEntity.kt`; `app/src/test/java/com/example/cepapplication/data/local/RoomPersistenceTest.kt` (Room real) e `RoomCepLocalDataSourceTest.kt` (encapsulamento de falhas).
 - **Dependências:** T-001.
 - **Aceite:** A/B/reconsulta de A resulta em dois registros e A primeiro; miss não escreve; observação não escreve; falha não deixa endereço/recência parcial. RF-003, RF-005, RF-006, RF-010, RF-011; RN-003, RN-006, RN-007.
 - **Unitários:** mapeamento de endereço sem exposição de metadados, se alterado de forma relevante.
@@ -430,7 +430,7 @@ As tarefas abaixo são planejadas, não executadas. Caminhos reais existentes e 
 #### T-007 — Integrar estado à tela de pesquisa
 
 - **O que:** encaminhar entrada ao ViewModel sem loop de máscara; renderizar endereço anterior em Loading/Error; manter controles/progresso; substituir wasLoading por estado de entrada e feedback consumível. Preservar textos/formatadores.
-- **Onde:** `app/src/main/java/com/example/cepapplication/SearchFragment.kt`, `AddressFormatting.kt`; recursos existentes em `app/src/main/res/values/strings.xml`; novo `app/src/androidTest/java/com/example/cepapplication/SearchFragmentTest.kt`.
+- **Onde:** `app/src/main/java/com/example/cepapplication/SearchFragment.kt`, `AddressFormatting.kt`; recursos existentes em `app/src/main/res/values/strings.xml`; novo `app/src/test/java/com/example/cepapplication/ConsultaCepUiTest.kt`.
 - **Dependências:** T-005, T-006, T-009 (infraestrutura para concluir os testes de tela).
 - **Aceite:** máscara/truncamento/zeros preservados; sucesso rápido limpa; falha conserva A identificado como A; controles seguem Loading; cada campo vazio mostra “Não informado”; feedback não repete na restauração. RF-001, RF-007–RF-009, RF-012; RN-002, RN-008–RN-010.
 - **Unitários:** preservar/ampliar casos pertinentes de `app/src/test/java/com/example/cepapplication/ZipCodeFormatterTest.kt`; não testar novamente a implementação literal da máscara sem cenário funcional.
@@ -441,7 +441,7 @@ As tarefas abaixo são planejadas, não executadas. Caminhos reais existentes e 
 #### T-008 — Lista reativa e navegação sem escrita
 
 - **O que:** apresentar ordem recebida e vazio confirmado; manter dados anteriores diante de falha de leitura; preservar navegação/coleta e o fluxo de apresentação existente.
-- **Onde:** `app/src/main/java/com/example/cepapplication/SavedAddressesFragment.kt` e integração com ViewModel; novo `app/src/androidTest/java/com/example/cepapplication/SavedAddressesFragmentTest.kt`.
+- **Onde:** `app/src/main/java/com/example/cepapplication/SavedAddressesFragment.kt` e integração com ViewModel; novo `app/src/test/java/com/example/cepapplication/ConsultaCepUiTest.kt`.
 - **Dependências:** T-006, T-007, T-009.
 - **Aceite:** A reconsultado aparece primeiro, lista reage às mudanças locais e abrir/fechar não altera ordem; mensagem de vazio somente após leitura vazia confirmada. RF-010, RF-011; RN-006, RN-007.
 - **Unitários:** sem nova lógica de ordenação na UI; já testada em T-002/T-006.
@@ -454,18 +454,18 @@ As tarefas abaixo são planejadas, não executadas. Caminhos reais existentes e 
 #### T-009 — Infraestrutura determinística de testes
 
 - **O que:** disponibilizar substituições mínimas na composição manual para banco de teste e fonte remota controlada. Não introduzir framework de DI ou configuração de teste na UI do produto. Usar Room real isolado, A/B e cenários de erro. Prover atrasos controlados por coroutine, sem sleeps frágeis.
-- **Onde:** `app/src/main/java/com/example/cepapplication/AppContainer.kt`, `CepApplication.kt` somente no necessário à composição; helpers novos em `app/src/androidTest/java/com/example/cepapplication/testing/`; `app/build.gradle.kts` somente se dependência de teste for indispensável. Testes do adaptador em `app/src/test/java/com/example/cepapplication/data/remote/RetrofitCepRemoteDataSourceTest.kt` (novo), além de `data/ViaCepResponseTest.kt` existente.
+- **Onde:** `app/src/main/java/com/example/cepapplication/AppContainer.kt`, `CepApplication.kt` somente no necessário à composição; helpers novos em `app/src/test/java/com/example/cepapplication/testing/`; `app/build.gradle.kts` somente se dependência de teste for indispensável. Testes do adaptador em `app/src/test/java/com/example/cepapplication/data/remote/RetrofitCepRemoteDataSourceTest.kt` (novo), além de `data/ViaCepResponseTest.kt` existente.
 - **Dependências:** T-004. Pode ser executada antes de T-007/T-008 para suportar seus testes; não depende das telas ajustadas.
 - **Aceite:** sem ViaCEP pública obrigatória, sem modificar banco de uso do app, contagem de rede verificável e dados isolados entre testes. Exercitar adaptador real com ViaCepApi substituível para sucesso/ausência/IOException/HttpException; manter testes JSON/DTO para conversão.
 - **Unitários:** adaptador, DTO parcial/inexistente e doubles com comportamento relevante.
-- **Integração:** composição com Room real; criar/fechar e remover somente arquivos exclusivos dos testes. Usar AndroidJUnitRunner/Espresso existentes e recursos disponíveis antes de adicionar bibliotecas.
+- **Integração:** composição com Room real; criar/fechar e remover somente arquivos exclusivos dos testes. Usar Robolectric/JUnit existentes, sem aparelho, emulador, ADB ou testes instrumentados.
 - **E2E:** infraestrutura usada em T-007, T-008 e T-010. Uma API controlada não comprova disponibilidade da ViaCEP pública nem transporte HTTP real; registrar essa limitação.
 - **Complexidade:** média.
 
 #### T-010 — Cenários completos de aceite
 
 - **O que:** percorrer UI→ViewModel→casos de uso→repositório→Room com remoto controlado, verificando apresentação, chamadas e estado persistido.
-- **Onde:** novo `app/src/androidTest/java/com/example/cepapplication/ConsultaCepFlowTest.kt` e helpers de T-009.
+- **Onde:** novo `app/src/test/java/com/example/cepapplication/ConsultaCepFlowTest.kt` e helpers de T-009.
 - **Dependências:** T-007, T-008, T-009.
 - **Aceite:** todos os CA-01–CA-11 da seção 8.3, mais falha de leitura/gravação e dados parciais, com asserts de banco e rede. Não basta conferir texto de tela.
 - **Unitários:** reutilizar evidências das tarefas de negócio, sem duplicar sua implementação nos testes.
@@ -478,7 +478,7 @@ As tarefas abaixo são planejadas, não executadas. Caminhos reais existentes e 
 - **O que:** executar comandos completos, corrigir falhas do escopo e produzir relatório com resultados reais, ambiente e limitações.
 - **Onde:** Gradle Wrapper; novo `docs/consulta-cep/validacao-consulta-cep.md`.
 - **Dependências:** T-010.
-- **Aceite:** testes unitários e build aprovados. A validação padrão do projeto não requer aparelho, emulador, ADB ou execução de testes instrumentados; esses testes podem permanecer como cobertura complementar. Não tratar problema histórico de loopback como resultado atual.
+- **Aceite:** testes unitários e build aprovados. Toda cobertura automatizada deve executar localmente; não usar aparelho, emulador, ADB ou testes instrumentados. Não tratar problema histórico de loopback como resultado atual.
 - **Unitários:** executar `testDebugUnitTest` pelo Wrapper, conforme os comandos PowerShell abaixo.
 - **Integração/E2E:** cobrir os cenários por testes automatizados que possam ser executados sem aparelho/emulador. Registrar as classes e cenários efetivamente executados.
 - **Build/documentação:** `assembleDebug` e `git diff --check`. Reexecutar após correção somente verificações pertinentes e a consolidação necessária.
@@ -620,7 +620,7 @@ EC-014 corresponde ao aceite adicional do FRD revisado. EC-015 é verificação 
 | Restauração atrasada | Invalidação exclusiva dessa leitura e conferência antes de publicar |
 | Erro de observação aparecer como vazio | Preservar últimos dados e distinguir leitura vazia confirmada de erro |
 | Versões locais e runtime de build | Verificar com Wrapper na implementação; não inferir JDK de execução só de sourceCompatibility |
-| Testes instrumentados indisponíveis | Não bloqueiam a validação padrão; registrar a limitação somente se ela afetar algum cenário que não possua cobertura automatizada executável sem aparelho/emulador |
+| Estratégia local de testes | Room, migrações e telas são exercitados por Robolectric/JUnit; registrar limitações de transporte público e hardware |
 | Rede controlada nos E2E | Demonstra lógica/integração interna; não certifica disponibilidade pública nem transporte real da ViaCEP |
 
 Não há decisão funcional bloqueante remanescente. Detalhes de mecânica de testes e organização de helpers podem ser ajustados sem alterar contratos, escopo ou resultados obrigatórios. Qualquer impedimento que exija mudança funcional deve ser apresentado ao usuário antes de alterar o escopo.
@@ -637,10 +637,24 @@ Todos os requisitos funcionais do FRD revisado estão contemplados; nenhum foi a
 - Histórico com uma linha por tentativa.
 - Mutex, serialização no repositório, guardas adicionais para pesquisas simultâneas, segunda leitura defensiva antes de salvar e testes de consultas simultâneas.
 - Framework de DI, mudança de stack, atualização geral de dependências, seeds volumosos e novos pipelines de deploy.
-- Implementar tarefas durante a criação deste documento.
+- Alterar regras funcionais fora do FRD aprovado.
 
 ## 11. Registro desta entrega documental
 
 O Blueprint foi consolidado após revisão da decomposição e das tarefas em conversa. FRD e AGENTS.md já haviam sido ajustados para a decisão sobre consultas simultâneas; essas alterações anteriores foram preservadas.
 
-Verificações desta entrega: revisão de rastreabilidade, estados, modelos, erros, dependências e caminhos; verificação de whitespace com `git diff --check` e conferência explícita do novo arquivo. Nenhum build Android, teste unitário ou instrumentado foi executado para esta edição documental. Resultados da implementação futura deverão ser registrados pela T-011, não inferidos deste planejamento.
+Verificações desta entrega: revisão de rastreabilidade, estados, modelos, erros, dependências e caminhos; verificação de whitespace com `git diff --check` e conferência explícita do novo arquivo. Nenhum build Android, teste unitário ou instrumentado foi executado para esta edição documental.
+
+### 11.1 Registro da T-012 — Atualização da documentação ativa
+
+A T-012 foi executada em 07/09/2026. O README passou a descrever retorno local sem expiração, recência persistente e funcionamento offline; o FRD passou a distinguir comportamento implementado de validação pendente; e este Blueprint passou a registrar o estado real das tarefas. A T-011 permanece como evidência histórica de tentativa de validação: `testDebugUnitTest` e `assembleDebug` não chegaram à compilação por falta de acesso de leitura ao Android SDK, enquanto `git diff --check` passou. O relatório da T-011 não foi reescrito como se houvesse uma nova execução.
+
+### 11.2 Correções da revisão — 07/09/2026
+
+Após aprovação de R-01–R-07, foram tratados erros da restauração, recuperação da observação ao reabrir e feedback consumível de falha. A guarda do Job de observação evita duplicar coletores de leitura; não protege consultas simultâneas do usuário.
+
+T-001/T-002 têm testes locais de migração v1/v2/v3→v4, reabertura, unicidade, ordem, rollback e cancelamento antes do commit. T-007/T-008/T-010 possuem integração das telas com Room e remoto controlado em ConsultaCepUiTest. ConsultaCepFlowTest aguarda estados finais com prazo real e encerra ViewModels antes de fechar bancos; A/B/A agora reabre o arquivo persistido.
+
+A colagem de letras/excesso revelou truncamento anterior à máscara pelo maxLength XML. Esse limite bruto foi removido: a máscara continua removendo não numéricos e limitando a oito dígitos, conforme RF-001/RN-002. Não há alteração de escopo ou layout visual.
+
+T-011: 80 testes passaram e assembleDebug concluiu na mesma execução. T-012: documentação ativa e relatórios atualizados, preservando as tentativas históricas. A validação usa Robolectric, sem transporte HTTP real ou hardware; não certifica disponibilidade da ViaCEP. Evidências e matriz atual em test-report-consulta-cep.md.

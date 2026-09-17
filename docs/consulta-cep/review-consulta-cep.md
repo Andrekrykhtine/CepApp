@@ -210,3 +210,46 @@ Evidências geradas: `app/build/reports/tests/testDebugUnitTest/index.html` e XM
 5. **R-07:** atualizar documentação ativa e registrar nova validação. Executar testes afetados, suíte completa, build se houver mudança de produção e `git diff --check`.
 
 Os itens críticos e altos são recomendados para correção. Os itens médios R-06/R-07 ficam explicitados para decisão de prioridade. Este plano foi posteriormente aprovado e executado; ver a situação atual no início do relatório.
+
+## Revisão complementar — cards dos CEPs armazenados (17/09/2026)
+
+Escopo desta revisão: migração da apresentação de `SavedAddressesFragment` para `RecyclerView`, com um `MaterialCardView` por endereço. Os resultados históricos acima não validam esta mudança posterior.
+
+### Resumo e evidência
+
+- **Erros de compilação confirmados:** nenhum. `testDebugUnitTest --stacktrace` parou antes da compilação, na conexão do cliente Gradle com o daemon: `Unable to establish loopback connection`, causado por `java.net.SocketException: Invalid argument: connect` em `java.nio.channels.Selector.open`.
+- **Findings de código:** dois pontos de qualidade a corrigir/verificar, ambos de severidade média. Conformidade observável com RF-011 e RF-012: parcial até a execução dos testes e do build.
+- **Segurança:** nenhuma nova superfície de entrada ou persistência foi adicionada pela mudança de apresentação.
+- `git diff --check` retornou saída 0. O APK e o relatório de testes existentes são anteriores a esta mudança e não servem como validação atual.
+
+### Findings
+
+#### RV-01 — [MÉDIO] A lista vazia permanece sobre a mensagem de vazio
+
+**Eixo:** FRD / Qualidade. **Localização:** `app/src/main/res/layout/fragment_saved_addresses.xml`, `app/src/main/java/com/example/cepapplication/SavedAddressesFragment.kt`. **Referência:** RF-011; T-008.
+
+O `RecyclerView` ocupa todo o `FrameLayout` e continua visível quando `state.hasLoaded && state.addresses.isEmpty()`. A mensagem de vazio é um irmão desenhado antes dele. Como a lista não tem fundo opaco, o texto pode aparecer, mas a hierarquia e a área de toque/acessibilidade ainda contêm uma lista vazia cobrindo a mensagem. Alternar a visibilidade do `RecyclerView` junto com a do título e da mensagem; verificar também o estado inicial ainda não carregado.
+
+#### RV-02 — [MÉDIO] Teste dos cards depende de um ViewHolder já materializado
+
+**Eixo:** Qualidade / Cobertura. **Localização:** `app/src/test/java/com/example/cepapplication/ConsultaCepUiTest.kt`, teste `navegacaoListaReativaRecriacaoDaViewSemEscritaOuFeedbackRepetido`. **Referência:** RF-011, RF-012; T-008.
+
+O teste espera `findViewHolderForAdapterPosition(0)`, que pode permanecer `null` se o Robolectric não executar layout/medição da lista no cenário. Também valida o conteúdo somente do primeiro card, embora espere dois itens. Fazer o layout explicitamente quando necessário e verificar conteúdo e card de A e B após a atualização assíncrona do `ListAdapter`, mantendo a afirmação sobre a ordem e a ausência de escrita ao abrir a tela.
+
+### Matriz de cobertura deste escopo
+
+| Regra | Implementação observada | Evidência de teste atual |
+| --- | --- | --- |
+| RF-011 / RN-006 / RN-007 — lista reativa, ordenada, sem escrita ao abrir | `ListAdapter` recebe a ordem do estado e usa CEP no `DiffUtil` | Teste atualizado, porém não executado após a mudança |
+| RF-011 — vazio confirmado | Mensagem depende de `hasLoaded` e lista vazia | Teste existe; sobreposição da lista requer ajuste |
+| RF-012 — sete campos e “Não informado” | Item reutiliza `formatAddress` | Teste verifica somente o primeiro card; execução pendente |
+
+### O que está correto
+
+`SavedAddressesAdapter` recebe os registros já ordenados, usa o CEP como identidade e compara os sete campos para atualização. Cada item tem seu próprio `MaterialCardView`. O Fragment mantém coleta vinculada ao ciclo de vida e preserva o tratamento de erro. Não há mudança no Room nem na recência ao abrir a lista.
+
+### Plano de correção
+
+1. Alternar a visibilidade do `RecyclerView` para mostrar apenas lista ou mensagem de vazio, conforme `SavedAddressesState`.
+2. Tornar o teste de UI determinístico quanto ao layout e conferir os dois cards, incluindo campos vazios formatados.
+3. Resolver a falha de loopback do ambiente Gradle sem alterar as regras do aplicativo; executar `testDebugUnitTest` e `assembleDebug`. Só então classificar eventuais diagnósticos do compilador ou falhas de teste como erros confirmados do código.

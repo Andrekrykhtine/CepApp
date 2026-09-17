@@ -20,6 +20,7 @@ import com.example.cepapplication.domain.usecase.InvalidCepException
 import com.example.cepapplication.ui.CepScreenState
 import com.example.cepapplication.ui.CepFeedback
 import com.example.cepapplication.ui.CepUiState
+import com.example.cepapplication.ui.CepViewModel
 import kotlinx.coroutines.launch
 import java.io.IOException
 

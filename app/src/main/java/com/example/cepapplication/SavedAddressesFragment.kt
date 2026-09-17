@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.cepapplication.databinding.FragmentSavedAddressesBinding
+import com.example.cepapplication.ui.CepViewModel
 import kotlinx.coroutines.launch
 
 class SavedAddressesFragment : Fragment() {

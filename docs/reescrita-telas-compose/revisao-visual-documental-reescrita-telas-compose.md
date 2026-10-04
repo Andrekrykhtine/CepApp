@@ -1,8 +1,8 @@
 # Revisão visual e documental — reescrita das telas em Compose
 
-Data: 17/09/2026  
-Tarefa: T-010 — Revisão visual e documental orientada pelo FRD  
-Escopo: revisão estática da UI Compose e atualização da documentação ativa.  
+Data: 17/09/2026
+Tarefa: T-010 — Revisão visual e documental orientada pelo FRD
+Escopo: revisão estática da UI Compose e atualização da documentação ativa.
 Estado: concluída somente no escopo documental; T-011 não foi executada.
 
 ## Referências e estado observado

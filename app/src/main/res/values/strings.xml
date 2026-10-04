@@ -22,6 +22,7 @@
     <string name="error_network">Não foi possível consultar o CEP. Verifique sua conexão e tente novamente.</string>
     <string name="error_unexpected">Não foi possível concluir a consulta. Tente novamente.</string>
     <string name="toast_zip_code_saved">Endereço disponível.</string>
+    <string name="navigate_back">Voltar</string>
 
 
 </resources>

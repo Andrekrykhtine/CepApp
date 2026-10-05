@@ -1,5 +1,6 @@
 package com.example.cepapplication.ui
 
+import androidx.lifecycle.SavedStateHandle
 import com.example.cepapplication.domain.model.Address
 import com.example.cepapplication.domain.repository.CepRepository
 import com.example.cepapplication.domain.usecase.GetAddressByCepUseCase
@@ -26,15 +27,65 @@ class CepViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
+    fun `starts with empty input when no task state is available`() = runTest {
+        val handle = SavedStateHandle()
+        val viewModel = createViewModel(FakeCepRepository(lookup = { address() }), handle)
+
+        assertEquals("", viewModel.screenState.value.input)
+        assertEquals(null, handle.get<String>("cep_input"))
+    }
+
+    @Test
+    fun `restores partial input and keeps it when loading the latest address`() = runTest {
+        val handle = SavedStateHandle(mapOf("cep_input" to "01001-"))
+        val restoredAddress = address()
+        var lookupCalls = 0
+        val viewModel = createViewModel(
+            FakeCepRepository(
+                lookup = { lookupCalls++; address() },
+                storedAddresses = flowOf(listOf(restoredAddress)),
+            ),
+            handle,
+        )
+
+        assertEquals("01001-", viewModel.screenState.value.input)
+        viewModel.loadLatestAddress()
+        advanceUntilIdle()
+
+        assertEquals("01001-", viewModel.screenState.value.input)
+        assertEquals("01001-", handle.get<String>("cep_input"))
+        assertEquals(restoredAddress, viewModel.screenState.value.lastSuccessfulAddress)
+        assertEquals(0, lookupCalls)
+    }
+
+    @Test
+    fun `updates saved input without starting a search`() = runTest {
+        val handle = SavedStateHandle()
+        var lookupCalls = 0
+        val viewModel = createViewModel(
+            FakeCepRepository(lookup = { lookupCalls++; address() }),
+            handle,
+        )
+
+        viewModel.updateInput("00123-")
+
+        assertEquals("00123-", viewModel.screenState.value.input)
+        assertEquals("00123-", handle.get<String>("cep_input"))
+        assertEquals(0, lookupCalls)
+    }
+
+    @Test
     fun `keeps previous address during loading and clears input on success`() = runTest {
         val deferredAddress = CompletableDeferred<Address?>()
         val repository = FakeCepRepository(lookup = { _ -> deferredAddress.await() })
-        val viewModel = createViewModel(repository)
+        val handle = SavedStateHandle()
+        val viewModel = createViewModel(repository, handle)
 
         viewModel.search("01001-000")
         runCurrent()
         assertEquals(CepUiState.Loading, viewModel.screenState.value.status)
         assertEquals("01001-000", viewModel.screenState.value.input)
+        assertEquals("01001-000", handle.get<String>("cep_input"))
         assertEquals(null, viewModel.screenState.value.lastSuccessfulAddress)
 
         val address = address()
@@ -42,13 +93,15 @@ class CepViewModelTest {
         advanceUntilIdle()
         assertEquals(CepUiState.Success(address), viewModel.screenState.value.status)
         assertEquals("", viewModel.screenState.value.input)
+        assertEquals("", handle.get<String>("cep_input"))
         assertEquals(address, viewModel.screenState.value.lastSuccessfulAddress)
         assertEquals(CepFeedback.Type.LookupCompleted, viewModel.screenState.value.feedback?.type)
     }
 
     @Test
     fun `moves to error with identifiable cause when zip code is invalid`() = runTest {
-        val viewModel = createViewModel(FakeCepRepository(lookup = { _ -> address() }))
+        val handle = SavedStateHandle()
+        val viewModel = createViewModel(FakeCepRepository(lookup = { _ -> address() }), handle)
 
         viewModel.search("01001-00")
         advanceUntilIdle()
@@ -57,6 +110,7 @@ class CepViewModelTest {
         assertTrue(state is CepUiState.Error)
         assertTrue((state as CepUiState.Error).cause is InvalidCepException)
         assertEquals("01001-00", viewModel.screenState.value.input)
+        assertEquals("01001-00", handle.get<String>("cep_input"))
         assertEquals(null, viewModel.screenState.value.lastSuccessfulAddress)
     }
 
@@ -66,7 +120,8 @@ class CepViewModelTest {
         val repository = FakeCepRepository(lookup = { zipCode ->
             if (zipCode == firstAddress.zipCode) firstAddress else throw IllegalStateException("Falha")
         })
-        val viewModel = createViewModel(repository)
+        val handle = SavedStateHandle()
+        val viewModel = createViewModel(repository, handle)
 
         viewModel.search("01001-000")
         advanceUntilIdle()
@@ -75,6 +130,7 @@ class CepViewModelTest {
 
         assertTrue(viewModel.screenState.value.status is CepUiState.Error)
         assertEquals("20000-000", viewModel.screenState.value.input)
+        assertEquals("20000-000", handle.get<String>("cep_input"))
         assertEquals(firstAddress, viewModel.screenState.value.lastSuccessfulAddress)
     }
 
@@ -125,13 +181,42 @@ class CepViewModelTest {
     }
 
     @Test
+    fun `new ViewModel restores recoverable input and address without old feedback`() = runTest {
+        val savedAddress = address()
+        var lookupCalls = 0
+        val repository = FakeCepRepository(
+            lookup = { lookupCalls += 1; savedAddress },
+            storedAddresses = flowOf(listOf(savedAddress)),
+        )
+        val firstViewModel = createViewModel(repository)
+        firstViewModel.search(savedAddress.zipCode)
+        advanceUntilIdle()
+        firstViewModel.consumeFeedback(requireNotNull(firstViewModel.screenState.value.feedback).id)
+
+        val restoredViewModel = createViewModel(
+            repository,
+            SavedStateHandle(mapOf("cep_input" to "20000-")),
+        )
+        restoredViewModel.loadLatestAddress()
+        advanceUntilIdle()
+
+        assertEquals("20000-", restoredViewModel.screenState.value.input)
+        assertEquals(CepUiState.Success(savedAddress), restoredViewModel.screenState.value.status)
+        assertEquals(savedAddress, restoredViewModel.screenState.value.lastSuccessfulAddress)
+        assertEquals(null, restoredViewModel.screenState.value.feedback)
+        assertEquals(1, lookupCalls)
+    }
+
+    @Test
     fun `does not let delayed restoration replace a search state`() = runTest {
         val delayedAddresses = CompletableDeferred<List<Address>>()
+        val handle = SavedStateHandle(mapOf("cep_input" to "00123-"))
         val viewModel = createViewModel(
             FakeCepRepository(
                 lookup = { throw IllegalStateException("Falha da pesquisa") },
                 storedAddresses = flow { emit(delayedAddresses.await()) },
             ),
+            handle,
         )
 
         viewModel.loadLatestAddress()
@@ -144,6 +229,7 @@ class CepViewModelTest {
         assertTrue(viewModel.screenState.value.status is CepUiState.Error)
         assertTrue((viewModel.screenState.value.status as CepUiState.Error).cause is InvalidCepException)
         assertEquals(null, viewModel.screenState.value.lastSuccessfulAddress)
+        assertEquals("01001-00", handle.get<String>("cep_input"))
     }
 
     @Test
@@ -302,9 +388,13 @@ class CepViewModelTest {
         assertEquals(CepUiState.Success(address()), model.screenState.value.status)
     }
 
-    private fun createViewModel(repository: CepRepository) = CepViewModel(
+    private fun createViewModel(
+        repository: CepRepository,
+        handle: SavedStateHandle = SavedStateHandle(),
+    ) = CepViewModel(
         getAddressByCep = GetAddressByCepUseCase(repository),
         getSavedAddresses = GetSavedAddressesUseCase(repository),
+        savedStateHandle = handle,
     )
 
     private class FakeCepRepository(

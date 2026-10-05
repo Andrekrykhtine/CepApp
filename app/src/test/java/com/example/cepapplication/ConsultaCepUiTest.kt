@@ -1,50 +1,71 @@
 package com.example.cepapplication
 
-import android.app.Application
 import android.os.Looper
-import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import androidx.navigation.fragment.NavHostFragment
-import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.card.MaterialCardView
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.hasScrollAction
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertHasScrollAction
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.fetchSemanticsNodes
+import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNode
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
+import com.example.cepapplication.data.local.RoomCepLocalDataSource
 import com.example.cepapplication.data.remote.CepRemoteDataSource
+import com.example.cepapplication.data.repository.CepRepositoryImpl
 import com.example.cepapplication.domain.model.Address
+import com.example.cepapplication.domain.usecase.GetAddressByCepUseCase
+import com.example.cepapplication.domain.usecase.GetSavedAddressesUseCase
 import com.example.cepapplication.testing.IsolatedRoomDatabase
 import com.example.cepapplication.ui.CepUiState
+import com.example.cepapplication.ui.CepViewModel
+import com.example.cepapplication.ui.compose.CepApp
+import com.example.cepapplication.ui.compose.CepTheme
+import com.example.cepapplication.ui.compose.SearchScreen
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.android.controller.ActivityController
-import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowToast
 import retrofit2.HttpException
 import retrofit2.Response
 
-class UiTestApplication : CepApplication() {
-    override val container: AppContainer by lazy { factory(this) }
-    companion object {
-        lateinit var factory: (Application) -> AppContainer
-    }
-}
 @RunWith(RobolectricTestRunner::class)
-@Config(application = UiTestApplication::class)
 class ConsultaCepUiTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
     private lateinit var fixture: IsolatedRoomDatabase
-    private lateinit var controller: ActivityController<MainActivity>
-    private lateinit var activity: MainActivity
+    private lateinit var viewModel: CepViewModel
     private val requests = mutableListOf<String>()
     private var failure: Throwable? = null
     private var gate: CompletableDeferred<Unit>? = null
@@ -62,78 +83,116 @@ class ConsultaCepUiTest {
     @Before
     fun setup() {
         fixture = IsolatedRoomDatabase.create(RuntimeEnvironment.getApplication())
-        UiTestApplication.factory = { context ->
-            AppContainer(context, databaseFactory = { fixture.database }, remoteDataSourceFactory = { remote })
+        val repository = CepRepositoryImpl(
+            localDataSource = RoomCepLocalDataSource(fixture.database.addressDao()),
+            remoteDataSource = remote,
+        )
+        viewModel = CepViewModel(
+            getAddressByCep = GetAddressByCepUseCase(repository),
+            getSavedAddresses = GetSavedAddressesUseCase(repository),
+            savedStateHandle = SavedStateHandle(),
+        )
+        composeRule.setContent {
+            CepTheme {
+                CepApp(viewModel = viewModel)
+            }
         }
-        controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        activity = controller.get()
-        awaitUi { activity.cepViewModel.savedAddressesState.value.hasLoaded }
+        awaitUi { viewModel.savedAddressesState.value.hasLoaded }
         ShadowToast.reset()
     }
 
     @After
     fun cleanup() {
-        if (::controller.isInitialized) controller.pause().stop().destroy()
+        if (::viewModel.isInitialized) viewModel.viewModelScope.cancel()
         if (::fixture.isInitialized) fixture.close()
+        requests.clear()
+        failure = null
+        gate = null
     }
 
-    private fun <T : View> view(id: Int): T = activity.findViewById(id)
-    private fun idle() { shadowOf(Looper.getMainLooper()).idle() }
+    private fun idle() {
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
     private fun awaitUi(condition: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (true) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
             idle()
-            if (condition()) return
-            if (System.nanoTime() > deadline) fail("A UI não concluiu dentro do prazo")
-            Thread.yield()
+            condition()
         }
     }
+
+    private fun input() = composeRule.onNode(hasSetTextAction())
+
     private fun search(cep: String) {
-        view<EditText>(R.id.edtZipCode).setText(cep)
-        view<Button>(R.id.btnSave).performClick()
+        input().performTextClearance()
+        input().performTextInput(cep)
+        composeRule.onNodeWithText("Consultar e salvar").performClick()
         idle()
     }
-    private fun awaitSuccess() = awaitUi { activity.cepViewModel.screenState.value.status is CepUiState.Success }
-    private fun awaitError() = awaitUi { activity.cepViewModel.screenState.value.status is CepUiState.Error }
-    private fun rows() = runBlocking { fixture.database.addressDao().observeAll().first() }
-    private fun openList() {
-        view<Button>(R.id.btnStoredZipCodes).performClick()
-        awaitUi { activity.findViewById<View>(R.id.recyclerSavedAddresses) != null }
+
+    private fun awaitSuccess() {
+        awaitUi { viewModel.screenState.value.status is CepUiState.Success }
+        composeRule.waitForIdle()
     }
+
+    private fun awaitError() {
+        awaitUi { viewModel.screenState.value.status is CepUiState.Error }
+        composeRule.waitForIdle()
+    }
+
+    private fun awaitToast(stringRes: Int) {
+        val expected = RuntimeEnvironment.getApplication().getString(stringRes)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            ShadowToast.getTextOfLatestToast() == expected
+        }
+    }
+
+    private fun rows() = runBlocking { fixture.database.addressDao().observeAll().first() }
+
+    private fun openList() {
+        composeRule.onNodeWithText("CEPs armazenados").performClick()
+        composeRule.onNodeWithText("CEPs armazenados").assertIsDisplayed()
+    }
+
     private fun back() {
-        val host = activity.supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment
-        host.navController.popBackStack()
-        awaitUi { activity.findViewById<View>(R.id.edtZipCode) != null }
+        composeRule.onNodeWithContentDescription("Voltar").performClick()
+        composeRule.onNodeWithText("Busca CEP").assertIsDisplayed()
     }
 
     @Test
     fun mascaraValidacaoLoadingSeteCamposELimpeza() {
-        val input = view<EditText>(R.id.edtZipCode)
-        input.text.replace(0, input.length(), "a00123b456789")
-        assertEquals("00123-456", input.text.toString())
-        input.setText("0100100099")
-        assertEquals("01001-000", input.text.toString())
+        input().performTextInput("a00123b456789")
+        input().assertTextEquals("00123-456")
+        input().performTextClearance()
+        input().performTextInput("0100100099")
+        input().assertTextEquals("01001-000")
+
         search("123")
-        assertEquals(activity.getString(R.string.error_invalid_zip_code), input.error.toString())
+        awaitToast(R.string.error_invalid_zip_code)
+        input().assertTextEquals("123")
+        composeRule.onNodeWithText("Digite um CEP válido").assertDoesNotExist()
         assertTrue(requests.isEmpty())
         assertTrue(rows().isEmpty())
 
         gate = CompletableDeferred()
         search("01001000")
         awaitUi { requests.isNotEmpty() }
-        assertFalse(input.isEnabled)
-        assertFalse(view<Button>(R.id.btnSave).isEnabled)
-        assertEquals(View.VISIBLE, view<View>(R.id.progressLookup).visibility)
+        input().assertIsNotEnabled()
+        composeRule.onNodeWithText("Consultar e salvar").assertIsNotEnabled()
+        composeRule
+            .onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
+            .assertIsDisplayed()
         gate!!.complete(Unit)
         awaitSuccess()
-        assertTrue(input.isEnabled)
-        assertTrue(view<Button>(R.id.btnSave).isEnabled)
-        assertEquals(View.GONE, view<View>(R.id.progressLookup).visibility)
-        assertEquals("", input.text.toString())
-        val text = view<TextView>(R.id.txtLastAddress).text.toString()
-        assertEquals(activity.formatAddress(a), text)
-        assertEquals(7, text.lines().size)
-        assertTrue(text.contains("Complemento: Não informado"))
+        input().assertIsEnabled()
+        composeRule.onNodeWithText("Consultar e salvar").assertIsEnabled()
+        input().assertTextEquals("")
+        assertEquals(7, activityAddressLines(a).size)
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
+        awaitToast(R.string.toast_zip_code_saved)
+        assertEquals(1, ShadowToast.shownToastCount())
         assertEquals(listOf("01001000"), requests)
         assertEquals(listOf("01001000"), rows().map { it.zipCode })
     }
@@ -142,25 +201,31 @@ class ConsultaCepUiTest {
     fun httpPreservaResultadoToastUnicoENovaTentativa() {
         search(a.zipCode)
         awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
         val before = rows()
         ShadowToast.reset()
         failure = HttpException(Response.error<Any>(500, "falha".toResponseBody()))
         search(b.zipCode)
         awaitError()
-        assertEquals(activity.getString(R.string.error_unexpected), ShadowToast.getTextOfLatestToast())
+        awaitToast(R.string.error_unexpected)
         assertEquals(1, ShadowToast.shownToastCount())
-        assertEquals("20040-002", view<EditText>(R.id.edtZipCode).text.toString())
-        assertEquals(activity.formatAddress(a), view<TextView>(R.id.txtLastAddress).text.toString())
+        input().assertTextEquals("20040-002")
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
         assertEquals(before, rows())
-        view<EditText>(R.id.edtZipCode).setText("2004000")
+        input().performTextClearance()
+        input().performTextInput("2004000")
         idle()
         assertEquals(1, ShadowToast.shownToastCount())
         openList()
         back()
         assertEquals(1, ShadowToast.shownToastCount())
+        input().assertTextEquals("20040-00")
         failure = null
         search(b.zipCode)
         awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
         assertEquals(listOf(b.zipCode, a.zipCode), rows().map { it.zipCode })
     }
 
@@ -168,28 +233,34 @@ class ConsultaCepUiTest {
     fun redeInexistenciaEConsultaLocalOffline() {
         search(a.zipCode)
         awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
         val before = rows()
         failure = IOException("offline")
         search(b.zipCode)
         awaitError()
-        assertEquals(activity.getString(R.string.error_network), ShadowToast.getTextOfLatestToast())
+        awaitToast(R.string.error_network)
         assertEquals(before, rows())
         search(a.zipCode)
         awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
         assertEquals(2, requests.size)
         failure = null
         search("99999999")
         awaitError()
-        assertEquals(activity.getString(R.string.error_zip_code_not_found),
-            view<EditText>(R.id.edtZipCode).error.toString())
+        awaitToast(R.string.error_zip_code_not_found)
+        input().assertTextEquals("99999-999")
+        composeRule.onNodeWithText("CEP não encontrado").assertDoesNotExist()
         assertEquals(listOf(a.zipCode), rows().map { it.zipCode })
-        assertEquals(activity.formatAddress(a), view<TextView>(R.id.txtLastAddress).text.toString())
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
     }
 
     @Test
     fun falhaAoSalvarPreservaBancoResultadoEPermiteNovaTentativa() {
         search(a.zipCode)
         awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
         val before = rows()
         fixture.database.openHelper.writableDatabase.execSQL(
             """CREATE TRIGGER fail_save BEFORE INSERT ON addresses BEGIN
@@ -199,44 +270,133 @@ class ConsultaCepUiTest {
         )
         search(b.zipCode)
         awaitError()
-        assertEquals(activity.getString(R.string.error_unexpected), ShadowToast.getTextOfLatestToast())
-        assertEquals(activity.formatAddress(a), view<TextView>(R.id.txtLastAddress).text.toString())
+        awaitToast(R.string.error_unexpected)
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
         assertEquals(before, rows())
         fixture.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_save")
         search(b.zipCode)
         awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
         assertEquals(listOf(b.zipCode, a.zipCode), rows().map { it.zipCode })
     }
 
     @Test
     fun navegacaoListaReativaRecriacaoDaViewSemEscritaOuFeedbackRepetido() {
         openList()
-        assertEquals(View.VISIBLE, view<View>(R.id.txtEmptyAddresses).visibility)
+        composeRule.onNodeWithText("Nenhum CEP armazenado.").assertIsDisplayed()
+        viewModel.search(a.zipCode)
+        awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
+        awaitUi { viewModel.savedAddressesState.value.addresses == listOf(a) }
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
+
+        viewModel.search(b.zipCode)
+        awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
+        awaitUi { viewModel.savedAddressesState.value.addresses == listOf(b, a) }
+        assertZipCodesInOrder(b, a)
+
         back()
         search(a.zipCode)
         awaitSuccess()
-        search(b.zipCode)
-        awaitSuccess()
-        search(a.zipCode)
-        awaitSuccess()
-        awaitUi { activity.cepViewModel.savedAddressesState.value.addresses.firstOrNull() == a }
+        awaitToast(R.string.toast_zip_code_saved)
+        awaitUi { viewModel.savedAddressesState.value.addresses.firstOrNull() == a }
         val before = rows()
         val toastCount = ShadowToast.shownToastCount()
         openList()
         assertEquals(listOf(a.zipCode, b.zipCode), before.map { it.zipCode })
-        val savedAddresses = view<RecyclerView>(R.id.recyclerSavedAddresses)
-        awaitUi { savedAddresses.adapter!!.itemCount == 2 }
-        assertEquals(listOf(a, b), (savedAddresses.adapter as SavedAddressesAdapter).currentList)
-        awaitUi { savedAddresses.findViewHolderForAdapterPosition(0) != null }
-        assertTrue(savedAddresses.findViewHolderForAdapterPosition(0)!!.itemView is MaterialCardView)
-        assertEquals(activity.formatAddress(a),
-            savedAddresses.findViewHolderForAdapterPosition(0)
-                ?.itemView?.findViewById<TextView>(R.id.txtSavedAddress)?.text.toString())
+        assertZipCodesInOrder(a, b)
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
         back()
         assertEquals(before, rows())
         assertEquals(2, requests.size)
         assertEquals(toastCount, ShadowToast.shownToastCount())
-        assertEquals(activity.formatAddress(a), view<TextView>(R.id.txtLastAddress).text.toString())
-        assertEquals("", view<EditText>(R.id.edtZipCode).text.toString())
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
+        input().assertTextEquals("")
     }
+
+    @Test
+    fun novoViewModelNaComposicaoRestauraEstadoSemToastOuNovaConsulta() {
+        search(a.zipCode)
+        awaitSuccess()
+        awaitToast(R.string.toast_zip_code_saved)
+        viewModel.updateInput("20040-00")
+        val requestsBeforeRecreation = requests.toList()
+
+        viewModel.viewModelScope.cancel()
+        ShadowToast.reset()
+        viewModel = createViewModel(SavedStateHandle(mapOf("cep_input" to "20040-00")))
+        composeRule.setContent {
+            CepTheme {
+                CepApp(viewModel = viewModel)
+            }
+        }
+
+        awaitUi {
+            viewModel.savedAddressesState.value.hasLoaded &&
+                viewModel.screenState.value.lastSuccessfulAddress == a
+        }
+        composeRule.onNode(hasSetTextAction()).assertTextEquals("20040-00")
+        activityAddressLines(a).forEach { line ->
+            composeRule.onNodeWithText(line).assertIsDisplayed()
+        }
+        assertEquals(requestsBeforeRecreation, requests)
+        assertEquals(0, ShadowToast.shownToastCount())
+    }
+
+    @Test
+    fun alturaReduzidaMantemRolagemEAcaoDeListaAlcancavel() {
+        composeRule.setContent {
+            CepTheme {
+                Box(modifier = Modifier.size(320.dp, 240.dp)) {
+                    SearchScreen(
+                        state = com.example.cepapplication.ui.CepScreenState(lastSuccessfulAddress = a),
+                        onInputChange = {},
+                        onSearch = {},
+                        onOpenSaved = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.onNode(hasScrollAction()).assertHasScrollAction()
+        composeRule.onNodeWithText("CEPs armazenados").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun createViewModel(handle: SavedStateHandle): CepViewModel {
+        val repository = CepRepositoryImpl(
+            localDataSource = RoomCepLocalDataSource(fixture.database.addressDao()),
+            remoteDataSource = remote,
+        )
+        return CepViewModel(
+            getAddressByCep = GetAddressByCepUseCase(repository),
+            getSavedAddresses = GetSavedAddressesUseCase(repository),
+            savedStateHandle = handle,
+        )
+    }
+
+    private fun activityAddressLines(address: Address): List<String> =
+        RuntimeEnvironment.getApplication().formatAddress(address).lines()
+
+    private fun assertZipCodesInOrder(first: Address, second: Address) {
+        val firstNode = zipCodeNodes(first).single()
+        val secondNode = zipCodeNodes(second).single()
+        assertTrue(
+            "Os cartões não estão na ordem recebida",
+            firstNode.boundsInRoot.top < secondNode.boundsInRoot.top,
+        )
+    }
+
+    private fun zipCodeNodes(address: Address) =
+        composeRule
+            .onAllNodesWithText("CEP: ${formatZipCode(address.zipCode)}", useUnmergedTree = true)
+            .fetchSemanticsNodes()
 }

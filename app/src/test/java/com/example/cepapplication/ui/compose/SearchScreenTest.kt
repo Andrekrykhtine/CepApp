@@ -1,20 +1,20 @@
 package com.example.cepapplication.ui.compose
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.hasScrollAction
-import androidx.compose.ui.test.assertHasScrollAction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -141,7 +141,7 @@ class SearchScreenTest {
             }
         }
 
-        composeRule.onNode(hasScrollAction()).assertHasScrollAction()
+        composeRule.onNode(hasScrollAction()).assert(hasScrollAction())
         composeRule.onNodeWithText("CEPs armazenados").performScrollTo().assertIsDisplayed()
     }
 

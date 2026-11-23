@@ -5,19 +5,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.hasScrollAction
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertHasScrollAction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.fetchSemanticsNodes
 import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -367,7 +364,7 @@ class ConsultaCepUiTest {
             }
         }
 
-        composeRule.onNode(hasScrollAction()).assertHasScrollAction()
+        composeRule.onNode(hasScrollAction()).assert(hasScrollAction())
         composeRule.onNodeWithText("CEPs armazenados").performScrollTo().assertIsDisplayed()
     }
 

@@ -25,9 +25,11 @@ import org.junit.After
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -222,6 +224,110 @@ class ConsultaCepFlowTest {
     }
 
     @Test
+    fun `falha de escrita Room preserva historico e permite nova tentativa`() = runTest {
+        val a = address("01001000")
+        val b = address("20000000", street = "Rua B")
+        IsolatedRoomDatabase.create(RuntimeEnvironment.getApplication(), beforeClose = ::closeModels).use { fixture ->
+            val remote = FlowRemoteDataSource(addresses = mapOf(a.zipCode to a, b.zipCode to b))
+            val repository = repository(fixture, remote)
+            val viewModel = viewModel(repository)
+
+            viewModel.search(a.zipCode)
+            runCurrent()
+            viewModel.awaitConclusion()
+            val before = repository.observeSavedAddresses().first()
+
+            fixture.database.openHelper.writableDatabase.execSQL(
+                """CREATE TRIGGER fail_flow_save BEFORE INSERT ON addresses BEGIN
+                    UPDATE addresses SET last_consultation_order = 99;
+                    SELECT RAISE(ABORT, 'falha controlada');
+                END""".trimIndent(),
+            )
+            viewModel.search(b.zipCode)
+            runCurrent()
+            viewModel.awaitConclusion()
+
+            val failure = viewModel.screenState.value.status as CepUiState.Error
+            assertTrue(failure.cause is LocalStorageException)
+            assertEquals(a, viewModel.screenState.value.lastSuccessfulAddress)
+            assertEquals(before, repository.observeSavedAddresses().first())
+
+            fixture.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_flow_save")
+            viewModel.search(b.zipCode)
+            runCurrent()
+            viewModel.awaitConclusion()
+
+            assertEquals(CepUiState.Success(b), viewModel.screenState.value.status)
+            assertEquals(listOf(b, a), repository.observeSavedAddresses().first())
+            assertEquals(listOf(a.zipCode, b.zipCode, b.zipCode), remote.requestedZipCodes)
+        }
+    }
+
+    @Test
+    fun `lista Room reativa atualiza ordem sem duplicar o CEP`() = runTest {
+        val a = address("01001000")
+        val b = address("20000000", street = "Rua B")
+        IsolatedRoomDatabase.create(RuntimeEnvironment.getApplication(), beforeClose = ::closeModels).use { fixture ->
+            val remote = FlowRemoteDataSource(addresses = mapOf(a.zipCode to a, b.zipCode to b))
+            val repository = repository(fixture, remote)
+            val emissions = mutableListOf<List<Address>>()
+            val expectedOrder = CompletableDeferred<Unit>()
+            val observation = launch {
+                repository.observeSavedAddresses().collect {
+                    emissions += it
+                    if (it == listOf(a, b)) expectedOrder.complete(Unit)
+                }
+            }
+            runCurrent()
+
+            repository.getAddress(a.zipCode)
+            runCurrent()
+            repository.getAddress(b.zipCode)
+            runCurrent()
+            repository.getAddress(a.zipCode)
+            advanceUntilIdle()
+            withTimeout(5_000) {
+                expectedOrder.await()
+            }
+
+            observation.cancel()
+            assertEquals(listOf(a, b), repository.observeSavedAddresses().first())
+            assertEquals(2, repository.observeSavedAddresses().first().size)
+            assertTrue(emissions.any { it == listOf(b, a) })
+        }
+    }
+
+    @Test
+    fun `novo ViewModel restaura entrada parcial e endereco persistido sem consultar`() = runTest {
+        val saved = address("01001000")
+        IsolatedRoomDatabase.create(RuntimeEnvironment.getApplication(), beforeClose = ::closeModels).use { fixture ->
+            val remote = FlowRemoteDataSource(addresses = mapOf(saved.zipCode to saved))
+            val repository = repository(fixture, remote)
+            val previous = viewModel(repository)
+            previous.search(saved.zipCode)
+            runCurrent()
+            previous.awaitConclusion()
+            previous.consumeFeedback(requireNotNull(previous.screenState.value.feedback).id)
+
+            val restored = CepViewModel(
+                GetAddressByCepUseCase(repository),
+                GetSavedAddressesUseCase(repository),
+                androidx.lifecycle.SavedStateHandle(mapOf("cep_input" to "20000-")),
+            ).also { models += it }
+            restored.loadLatestAddress()
+            runCurrent()
+            restored.awaitConclusion()
+
+            assertEquals("20000-", restored.screenState.value.input)
+            assertEquals(CepUiState.Success(saved), restored.screenState.value.status)
+            assertEquals(saved, restored.screenState.value.lastSuccessfulAddress)
+            assertEquals(null, restored.screenState.value.feedback)
+            assertEquals(listOf(saved.zipCode), remote.requestedZipCodes)
+            assertEquals(listOf(saved), repository.observeSavedAddresses().first())
+        }
+    }
+
+    @Test
     fun `restauracao e leitura da lista nao fazem nova consulta nem escrita`() = runTest {
         val saved = address("01001000")
         val remote = FlowRemoteDataSource()
@@ -262,6 +368,7 @@ class ConsultaCepFlowTest {
     private fun viewModel(repository: com.example.cepapplication.domain.repository.CepRepository) = CepViewModel(
         GetAddressByCepUseCase(repository),
         GetSavedAddressesUseCase(repository),
+        androidx.lifecycle.SavedStateHandle(),
     ).also { models += it }
 
     private fun repository(

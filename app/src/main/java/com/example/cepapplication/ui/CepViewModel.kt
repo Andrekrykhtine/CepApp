@@ -2,7 +2,10 @@ package com.example.cepapplication.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.cepapplication.domain.model.Address
 import com.example.cepapplication.domain.usecase.GetAddressByCepUseCase
 import com.example.cepapplication.domain.usecase.GetSavedAddressesUseCase
@@ -21,11 +24,13 @@ import kotlinx.coroutines.launch
 class CepViewModel(
     private val getAddressByCep: GetAddressByCepUseCase,
     private val getSavedAddresses: GetSavedAddressesUseCase,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val _screenState = MutableStateFlow(CepScreenState())
+    private val _screenState = MutableStateFlow(
+        CepScreenState(input = savedStateHandle[INPUT_KEY] ?: ""),
+    )
     val screenState: StateFlow<CepScreenState> = _screenState.asStateFlow()
 
-    // Mantido enquanto SearchFragment ainda consome o estado funcional diretamente.
     val uiState: StateFlow<CepUiState> = screenState
         .map { state -> state.status }
         .stateIn(
@@ -50,6 +55,10 @@ class CepViewModel(
     private var observationJob: Job? = null
     private var restorationJob: Job? = null
     private var restorationVersion = 0L
+
+    private companion object {
+        const val INPUT_KEY = "cep_input"
+    }
 
     init {
         observeSavedAddresses()
@@ -78,6 +87,7 @@ class CepViewModel(
     fun search(rawZipCode: String) {
         invalidateRestoration()
         viewModelScope.launch {
+            savedStateHandle[INPUT_KEY] = rawZipCode
             _screenState.value = _screenState.value.copy(
                 status = CepUiState.Loading,
                 input = rawZipCode,
@@ -85,6 +95,7 @@ class CepViewModel(
             )
             getAddressByCep(rawZipCode).fold(
                 onSuccess = { address ->
+                    savedStateHandle[INPUT_KEY] = ""
                     _screenState.value = _screenState.value.copy(
                         status = CepUiState.Success(address),
                         input = "",
@@ -107,6 +118,7 @@ class CepViewModel(
     }
 
     fun updateInput(input: String) {
+        savedStateHandle[INPUT_KEY] = input
         _screenState.value = _screenState.value.copy(input = input)
     }
 
@@ -170,10 +182,10 @@ class CepViewModelFactory(
     private val getSavedAddresses: GetSavedAddressesUseCase,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         require(modelClass.isAssignableFrom(CepViewModel::class.java)) {
             "ViewModel não suportado: ${modelClass.name}"
         }
-        return CepViewModel(getAddressByCep, getSavedAddresses) as T
+        return CepViewModel(getAddressByCep, getSavedAddresses, extras.createSavedStateHandle()) as T
     }
 }

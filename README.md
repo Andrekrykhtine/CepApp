@@ -29,21 +29,27 @@ O **Cep Application** é um aplicativo Android para consultar endereços pela Vi
 - **Funcionamento offline**: Consultas de CEPs já armazenados não dependem de conexão.
 - **Lista Reativa**: A tela de CEPs armazenados acompanha automaticamente as mudanças do banco.
 - **Validação de Entrada**: Bloqueio de salvamento para CEPs incompletos ou inválidos.
-- **Interface Moderna**: Construída com `Material Design` e `ViewBinding`.
+- **Interface Compose**: Pesquisa e lista construídas com Jetpack Compose Material 3.
 
 ## ✅ Estado da implementação
 
 O comportamento vigente segue o FRD de 07/09/2026: não há TTL de 24 horas, o armazenamento local tem prioridade e a recência representa a última consulta bem-sucedida. A migração de dados legados e os fluxos de persistência são mantidos conforme a implementação atual.
 
-Após as correções da revisão, em 07/09/2026, **80 testes locais passaram e o build debug concluiu** pelo Gradle Wrapper. A suíte inclui Room real, migrações e telas com Robolectric, sem ADB ou emulador. Evidências em [relatório de testes](docs/consulta-cep/test-report-consulta-cep.md) e [validação](docs/consulta-cep/validacao-consulta-cep.md). As tentativas anteriores bloqueadas por ambiente foram preservadas como histórico. Essa execução não certifica a disponibilidade da ViaCEP pública nem o comportamento em hardware.
+A interface ativa usa uma única `MainActivity`, que mantém o `CepViewModel` compartilhado e hospeda o `CepApp`. A navegação usa `Navigation Compose` com duas rotas:
+
+- **Busca CEP**: campo com máscara `00000-000`, consulta por botão, progresso durante a operação, cartão do último endereço e acesso à lista.
+- **CEPs armazenados**: lista somente para visualização, ordenada por recência, com ação de voltar para preservar o estado da pesquisa.
+
+O feedback de consulta é apresentado por Toast. A entrada parcial é mantida pelo `SavedStateHandle` quando o Android restaura uma tarefa com estado recuperável; o endereço e a lista continuam sendo recuperados do Room. A revisão visual e documental da migração está registrada em [revisão da UI Compose](docs/reescrita-telas-compose/revisao-visual-documental-reescrita-telas-compose.md).
+
+Em 07/09/2026, a validação histórica da consulta de CEP registrou **80 testes locais aprovados e build debug concluído** pelo Gradle Wrapper. Essa evidência pertence à implementação então validada e permanece nos [relatório de testes](docs/consulta-cep/test-report-consulta-cep.md) e [registro de validação](docs/consulta-cep/validacao-consulta-cep.md); os relatórios não foram reescritos pela migração Compose. Para esta revisão T-010, não foi executado build Android. Portanto, a compilação atual da UI Compose, o comportamento em hardware real e a disponibilidade pública da ViaCEP permanecem fora da evidência desta tarefa.
 
 ## 🛠️ Tecnologias
 
 - **Kotlin**: Linguagem de programação moderna e concisa.
 - **Android SDK**: Ferramentas e APIs para desenvolvimento Android.
-- **ViewBinding**: Integração segura entre código e layout XML.
-- **Material Components**: Design de interface seguindo padrões modernos.
-- **Navigation Component**: Navegação entre pesquisa e endereços armazenados.
+- **Jetpack Compose Material 3**: UI declarativa, tema claro/escuro e componentes visuais.
+- **Navigation Compose**: Navegação entre pesquisa e endereços armazenados.
 - **ViewModel e StateFlow**: Estado da interface e atualizações reativas.
 - **Retrofit**: Integração com a ViaCEP.
 - **Room**: Banco de dados local e migrações de schema.
@@ -86,17 +92,12 @@ CepApplication/
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── java/com/example/cepapplication/
-│   │   │   │   ├── ui/                   # ViewModel e estados da interface
+│   │   │   │   ├── ui/                   # ViewModel, estados e telas Compose
+│   │   │   │   │   └── compose/         # Tema, navegação, pesquisa e lista
 │   │   │   │   ├── domain/               # Modelos, regras e contratos
 │   │   │   │   ├── data/                 # Room, Retrofit e repositório
-│   │   │   │   ├── MainActivity.kt       # Navegação e ViewModel compartilhado
-│   │   │   │   ├── SearchFragment.kt     # Consulta de CEP
-│   │   │   │   └── SavedAddressesFragment.kt
+│   │   │   │   └── MainActivity.kt       # Entrada Compose e ViewModel compartilhado
 │   │   │   └── res/
-│   │   │       ├── layout/
-│   │   │       │   ├── activity_main.xml
-│   │   │       │   ├── fragment_search.xml
-│   │   │       │   └── fragment_saved_addresses.xml
 │   │   │       └── values/               # Recursos de cores, strings e dimensões
 │   └── build.gradle.kts                  # Configurações do módulo app
 ├── build.gradle.kts                      # Configurações do projeto nível raiz
